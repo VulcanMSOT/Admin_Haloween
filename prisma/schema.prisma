@@ -16,17 +16,29 @@ enum PaymentStatus {
 
 model Registration {
   id                 String        @id @default(cuid())
+  orderRef           String?       @unique @db.VarChar(32)
+  amount             Int           @default(300)
   ticketId           String?       @unique @db.VarChar(32)
+  ticketToken        String?       @unique @db.VarChar(64)
   teamName           String        @db.VarChar(40)
   normalizedTeamName String        @unique @db.VarChar(40)
   createdAt          DateTime      @default(now())
   paymentStatus      PaymentStatus @default(PENDING_PAYMENT)
   paymentReference   String?       @unique @db.VarChar(100)
+  utr                String?       @db.VarChar(64)
+  screenshotPath     String?       @db.VarChar(255)
   paymentTokenHash   String?       @unique @db.VarChar(64)
   paymentSubmittedAt DateTime?
   paymentApprovedAt  DateTime?
   paymentApprovedBy  String?       @db.VarChar(100)
   paymentNote        String?       @db.VarChar(500)
+  rejectReason       String?       @db.VarChar(500)
+  emailStatus        String?       @default("pending") @db.VarChar(32)
+  emailSentCount     Int           @default(0)
+  isComp             Boolean       @default(false)
+  compReason         String?       @db.VarChar(255)
+  revokedAt          DateTime?
+  revokedReason      String?       @db.VarChar(255)
   ticketEmailSentAt  DateTime?
   ticketEmailError   String?       @db.VarChar(500)
   ticketEmailId      String?       @db.VarChar(100)
@@ -36,6 +48,29 @@ model Registration {
   @@index([createdAt])
   @@index([checkedInAt])
   @@index([paymentStatus, createdAt])
+  @@index([utr])
+  @@index([orderRef])
+  @@index([ticketToken])
+}
+
+model Admin {
+  id        String   @id @default(uuid()) @db.VarChar(36)
+  email     String   @unique @db.VarChar(255)
+  role      String   @default("staff") @db.VarChar(32)
+  name      String?  @db.VarChar(100)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.VarChar(36)
+  adminEmail String   @db.VarChar(255)
+  action     String   @db.VarChar(64)
+  targetId   String?  @db.VarChar(100)
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([targetId])
+  @@index([createdAt(sort: Desc)])
 }
 
 model TeamMember {
