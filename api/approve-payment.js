@@ -20,7 +20,7 @@ export default async function handler(request, response) {
       if (!current || current.paymentStatus !== 'PENDING_REVIEW') return null;
       return tx.registration.update({
         where: { id: current.id },
-        data: { paymentStatus: 'PAID', paymentApprovedAt: new Date(), paymentApprovedBy: 'organiser', paymentNote: String(note || '').trim().slice(0, 500) || null, ticketId: ticketId(), paymentTokenHash: null },
+        data: { paymentStatus: 'PAID', paymentApprovedAt: new Date(), paymentApprovedBy: 'organiser', paymentNote: String(note || '').trim().slice(0, 500) || null, ticketId: ticketId() },
         include: { members: { orderBy: { position: 'asc' } } },
       });
     });
