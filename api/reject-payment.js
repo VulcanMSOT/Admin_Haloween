@@ -1,11 +1,12 @@
-import { json, methodNotAllowed, parseBody } from './_lib/http.js';
+import { handleCors, json, methodNotAllowed, parseBody } from './_lib/http.js';
 import { prisma } from './_lib/prisma.js';
 import { requireSession } from './_lib/session.js';
 import { logAdminAction } from './_lib/audit.js';
-import { sendRejectionEmail } from './_lib/ticket-email.js';
 
 export default async function handler(request, response) {
+  if (handleCors(request, response, ['POST', 'OPTIONS'])) return;
   if (request.method !== 'POST') return methodNotAllowed(response, ['POST']);
+
   const session = requireSession(request, response);
   if (!session) return;
 
@@ -40,26 +41,17 @@ export default async function handler(request, response) {
       action: 'reject_payment',
       targetId: updated.id,
       details: {
-        orderRef: updated.orderRef,
+        teamId: updated.teamId || updated.orderRef,
+        paymentRef: updated.paymentRef,
         utr: updated.utr,
         rejectReason: cleanReason,
       },
     });
 
-    let emailResult = { sent: false };
-    try {
-      emailResult = await sendRejectionEmail(updated, cleanReason);
-    } catch (emailErr) {
-      console.warn('Rejection email error:', emailErr);
-    }
-
     return json(response, 200, {
       ok: true,
       registration: updated,
-      emailSent: emailResult.sent,
-      message: emailResult.sent
-        ? 'Payment rejected and notification email sent to team leader.'
-        : 'Payment rejected. (Notification email could not be delivered).',
+      message: 'Payment rejected. You can now send the email notification with instructions to resubmit.',
     });
   } catch (error) {
     console.error('Payment rejection error:', error);

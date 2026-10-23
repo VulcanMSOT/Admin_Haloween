@@ -1,4 +1,4 @@
-import { json, methodNotAllowed } from './_lib/http.js';
+import { handleCors, json, methodNotAllowed } from './_lib/http.js';
 import { prisma } from './_lib/prisma.js';
 import { requireSession } from './_lib/session.js';
 import { createSignedScreenshotUrl } from './_lib/supabase-admin.js';
@@ -6,18 +6,24 @@ import { createSignedScreenshotUrl } from './_lib/supabase-admin.js';
 const validStatuses = new Set(['PENDING_PAYMENT', 'PENDING_REVIEW', 'PAID', 'REJECTED', 'EXPIRED']);
 
 export default async function handler(request, response) {
+  if (handleCors(request, response, ['GET', 'OPTIONS'])) return;
   if (request.method !== 'GET') return methodNotAllowed(response, ['GET']);
+
   const session = requireSession(request, response);
   if (!session) return;
 
   const search = String(request.query.search || '').trim().slice(0, 80);
   const status = validStatuses.has(request.query.status) ? request.query.status : undefined;
+  const emailFilter = String(request.query.emailFilter || '').trim();
 
   const where = {
     ...(status ? { paymentStatus: status } : {}),
+    ...(emailFilter === 'not_sent' ? { paymentStatus: 'PAID', emailStatus: { not: 'sent' } } : {}),
     ...(search
       ? {
           OR: [
+            { teamId: { contains: search, mode: 'insensitive' } },
+            { paymentRef: { contains: search, mode: 'insensitive' } },
             { teamName: { contains: search, mode: 'insensitive' } },
             { orderRef: { contains: search, mode: 'insensitive' } },
             { ticketId: { contains: search, mode: 'insensitive' } },
@@ -40,15 +46,16 @@ export default async function handler(request, response) {
   };
 
   try {
-    const [registrations, grouped, totalCheckedIn] = await prisma.$transaction([
+    const [registrations, grouped, totalCheckedIn, confirmedEmailNotSent] = await prisma.$transaction([
       prisma.registration.findMany({
         where,
-        take: 200,
+        take: 300,
         orderBy: { createdAt: 'desc' },
         include: { members: { orderBy: { position: 'asc' } } },
       }),
       prisma.registration.groupBy({ by: ['paymentStatus'], _count: { _all: true } }),
       prisma.registration.count({ where: { checkedInAt: { not: null } } }),
+      prisma.registration.count({ where: { paymentStatus: 'PAID', emailStatus: { not: 'sent' } } }),
     ]);
 
     const totals = Object.fromEntries(grouped.map((row) => [row.paymentStatus, row._count._all]));
@@ -74,6 +81,8 @@ export default async function handler(request, response) {
 
         return {
           id: r.id,
+          teamId: r.teamId || r.orderRef,
+          paymentRef: r.paymentRef,
           orderRef: r.orderRef,
           amount: r.amount,
           teamName: r.teamName,
@@ -86,8 +95,10 @@ export default async function handler(request, response) {
           rejectReason: r.rejectReason,
           ticketId: r.ticketId,
           ticketToken: r.ticketToken,
-          emailStatus: r.emailStatus,
-          emailSentCount: r.emailSentCount,
+          emailStatus: r.emailStatus || 'not_sent',
+          emailSentCount: r.emailSentCount || 0,
+          emailSentBy: r.emailSentBy,
+          emailSentAt: r.emailSentAt,
           ticketEmailSentAt: r.ticketEmailSentAt,
           ticketEmailError: r.ticketEmailError,
           isComp: r.isComp,
@@ -119,6 +130,7 @@ export default async function handler(request, response) {
         confirmed: paidCount,
         rejected: totals.REJECTED || 0,
         checkedIn: totalCheckedIn,
+        confirmedEmailNotSent,
         revenue: confirmedRevenue,
       },
     });

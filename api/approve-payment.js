@@ -1,9 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import { json, methodNotAllowed, parseBody } from './_lib/http.js';
+import { handleCors, json, methodNotAllowed, parseBody } from './_lib/http.js';
 import { prisma } from './_lib/prisma.js';
 import { requireSession } from './_lib/session.js';
 import { logAdminAction } from './_lib/audit.js';
-import { sendAndRecordTicketEmail } from './_lib/ticket-email.js';
 
 function ticketId() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -12,7 +11,9 @@ function ticketId() {
 }
 
 export default async function handler(request, response) {
+  if (handleCors(request, response, ['POST', 'OPTIONS'])) return;
   if (request.method !== 'POST') return methodNotAllowed(response, ['POST']);
+
   const session = requireSession(request, response);
   if (!session) return;
 
@@ -30,6 +31,7 @@ export default async function handler(request, response) {
     // Idempotent: if already paid, do not regenerate ticket
     if (existing.paymentStatus === 'PAID') {
       return json(response, 200, {
+        ok: true,
         registration: existing,
         alreadyApproved: true,
         message: 'This payment was already confirmed.',
@@ -57,27 +59,18 @@ export default async function handler(request, response) {
       action: 'confirm_payment',
       targetId: updated.id,
       details: {
-        orderRef: updated.orderRef,
+        teamId: updated.teamId || updated.orderRef,
+        paymentRef: updated.paymentRef,
         utr: updated.utr,
         ticketId: updated.ticketId,
         amount: updated.amount,
       },
     });
 
-    let emailResult = { sent: false };
-    try {
-      emailResult = await sendAndRecordTicketEmail(updated);
-    } catch (emailErr) {
-      console.error('Email send error:', emailErr);
-      emailResult = { sent: false, error: 'Payment approved, but ticket email failed to send.' };
-    }
-
     return json(response, 200, {
+      ok: true,
       registration: updated,
-      email: emailResult,
-      message: emailResult.sent
-        ? 'Payment confirmed and ticket emailed.'
-        : `Payment confirmed. ${emailResult.error || 'Email could not be delivered.'}`,
+      message: 'Payment confirmed and official ticket generated.',
     });
   } catch (error) {
     console.error('Payment approval error', error);

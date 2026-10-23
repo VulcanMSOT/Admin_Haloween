@@ -1,41 +1,59 @@
-import { json, methodNotAllowed, parseBody } from './_lib/http.js';
+import { handleCors, json, methodNotAllowed, parseBody } from './_lib/http.js';
 import { prisma } from './_lib/prisma.js';
 import { requireSession } from './_lib/session.js';
 import { logAdminAction } from './_lib/audit.js';
 
 export default async function handler(request, response) {
+  if (handleCors(request, response, ['POST', 'OPTIONS'])) return;
   if (request.method !== 'POST') return methodNotAllowed(response, ['POST']);
+
   const session = requireSession(request, response);
   if (!session) return;
 
   const rawCandidate = String(parseBody(request).ticketId || '').trim();
-  if (!rawCandidate) return json(response, 400, { error: 'Enter or scan a ticket ID / QR token.' });
+  if (!rawCandidate) return json(response, 400, { error: 'Enter or scan a ticket ID or QR code.' });
 
-  // Clean candidate: if a URL was scanned (e.g. https://.../verify/TOKEN), extract the token
-  const cleanToken = rawCandidate.split('/').pop().trim();
-  const upperToken = cleanToken.toUpperCase();
+  // Clean candidate: handles "VHK-1001:TOKEN", "TOKEN", full URLs, etc.
+  const cleanString = rawCandidate.split('/').pop().trim();
+  const parts = cleanString.split(':');
+  const candidateTeamId = parts[0]?.trim().toUpperCase();
+  const candidateUpper = cleanString.toUpperCase();
+
+  let whereClause;
+  if (parts.length >= 2 && parts[0] && parts[1]) {
+    whereClause = {
+      teamId: candidateTeamId,
+      ticketToken: parts[1].trim(),
+    };
+  } else {
+    whereClause = {
+      OR: [
+        { teamId: candidateUpper },
+        { ticketToken: cleanString },
+        { ticketId: candidateUpper },
+        { orderRef: candidateUpper },
+      ],
+    };
+  }
 
   try {
     const registration = await prisma.registration.findFirst({
-      where: {
-        OR: [
-          { ticketId: upperToken },
-          { ticketToken: cleanToken },
-          { orderRef: upperToken },
-        ],
-      },
+      where: whereClause,
       include: { members: { orderBy: { position: 'asc' } } },
     });
 
     if (!registration) {
-      return json(response, 404, { status: 'invalid', message: 'Invalid ticket. No matching record.' });
+      return json(response, 404, {
+        status: 'invalid',
+        message: 'INVALID TICKET: No matching registration found in database.',
+      });
     }
 
     if (registration.revokedAt) {
       return json(response, 200, {
         status: 'invalid',
         registration,
-        message: `Ticket REVOKED: ${registration.revokedReason || 'Revoked by admin'}`,
+        message: `TICKET REVOKED: ${registration.revokedReason || 'Revoked by admin'}`,
       });
     }
 
@@ -43,7 +61,7 @@ export default async function handler(request, response) {
       return json(response, 200, {
         status: 'invalid',
         registration,
-        message: `Unconfirmed ticket. Current payment status: ${registration.paymentStatus}`,
+        message: `PAYMENT UNCONFIRMED: Status is ${registration.paymentStatus}`,
       });
     }
 
@@ -51,7 +69,7 @@ export default async function handler(request, response) {
       return json(response, 200, {
         status: 'already',
         registration,
-        message: `Already checked in at ${new Date(registration.checkedInAt).toLocaleTimeString('en-IN')}`,
+        message: `ALREADY ADMITTED at ${new Date(registration.checkedInAt).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })}`,
       });
     }
 
@@ -66,23 +84,30 @@ export default async function handler(request, response) {
         where: { id: registration.id },
         include: { members: { orderBy: { position: 'asc' } } },
       });
-      return json(response, 200, { status: 'already', registration: current, message: 'Already checked in.' });
+      return json(response, 200, {
+        status: 'already',
+        registration: current,
+        message: 'ALREADY ADMITTED (concurrent scan caught).',
+      });
     }
 
     await logAdminAction({
       adminEmail: session.email,
       action: 'checkin',
       targetId: registration.id,
-      details: { ticketId: registration.ticketId, teamName: registration.teamName },
+      details: {
+        teamId: registration.teamId || registration.ticketId,
+        teamName: registration.teamName,
+      },
     });
 
     return json(response, 200, {
       status: 'valid',
       registration: { ...registration, checkedInAt: now },
-      message: 'Valid ticket. Entry recorded!',
+      message: 'VALID ENTRY — Welcome to Hack-O-Lantern!',
     });
   } catch (error) {
     console.error('Check-in error', error);
-    return json(response, 500, { error: 'Could not check this ticket.' });
+    return json(response, 500, { error: 'Could not process check-in.' });
   }
 }

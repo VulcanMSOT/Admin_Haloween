@@ -6,10 +6,12 @@ import './styles.css';
 const statusLabels = {
   PENDING_PAYMENT: 'Awaiting payment',
   PENDING_REVIEW: 'Review payment',
-  PAID: 'Ticket issued',
+  PAID: 'Ticket confirmed',
   REJECTED: 'Payment rejected',
   EXPIRED: 'Expired',
 };
+
+const PUBLIC_SITE_URL = import.meta.env.VITE_PUBLIC_SITE_URL || 'https://vulcan-club.vercel.app';
 
 function formatDate(value) {
   if (!value) return '—';
@@ -20,11 +22,11 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
-function api(path, options) {
+function api(path, options = {}) {
   return fetch(`/api/${path}`, options).then(async (response) => {
     const isJson = response.headers.get('content-type')?.includes('application/json');
     const data = isJson ? await response.json() : {};
-    if (!isJson) throw new Error('API route returned non-JSON response.');
+    if (!isJson && !response.ok) throw new Error('API route returned non-JSON response.');
     if (!response.ok) throw new Error(data.error || 'Something went wrong.');
     return data;
   });
@@ -35,6 +37,205 @@ function Logo() {
     <div className="brand">
       <span className="brand__mark" aria-hidden="true">V</span>
       <span>vulcan <b>operations</b></span>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// Manual Email Modal Component (Section 5)
+// -------------------------------------------------------------
+function ManualEmailModal({ registration, initialType = 'confirmed', onClose, onActionComplete }) {
+  const [templateType, setTemplateType] = useState(initialType);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [markedSent, setMarkedSent] = useState(registration.emailStatus === 'sent');
+  const [error, setError] = useState('');
+
+  const leader = registration.members?.find((m) => m.position === 1) || registration.members?.[0] || {};
+  const recipient = leader.email || '';
+  const teamId = registration.teamId || registration.orderRef || 'VHK-TEAM';
+  const paymentRef = registration.paymentRef || 'PAY-REF';
+  const teamName = registration.teamName || 'Your Team';
+  const ticketId = registration.ticketId || teamId;
+  const rejectReason = registration.rejectReason || 'UTR transaction could not be located in club statement.';
+
+  const ticketLookupUrl = `${PUBLIC_SITE_URL}/halloween-hack`;
+
+  let subject = '';
+  let body = '';
+
+  if (templateType === 'confirmed') {
+    subject = `Hack-O-Lantern Ticket Confirmed · Team ${teamId}`;
+    body = `Hi ${leader.fullName || 'Team Leader'},
+
+Great news! Your payment for Hack-O-Lantern (12-Hour Overnight Hackathon) has been verified and confirmed.
+
+Team Name: ${teamName}
+Team ID: ${teamId}
+Payment Reference: ${paymentRef}
+Official Ticket ID: ${ticketId}
+
+Event Schedule: Night of 31 October 2026, 7:00 PM – 1 November 2026, 7:00 AM (12 Hours)
+Venue: Mirai Floor, Bengaluru
+
+View and download your official entry pass & ticket QR code here:
+${ticketLookupUrl}
+
+(On the page, click "Already registered? Check status" and enter your Team ID ${teamId} and this email address).
+
+Show your ticket QR code at the entrance check-in desk for admission. Keep this email handy!
+
+Best regards,
+Vulcan Club Organizing Team
+Sender: nexcell_rathinam@msot.org`;
+  } else if (templateType === 'rejected') {
+    subject = `Action Required: Hack-O-Lantern Payment Update · Team ${teamId}`;
+    body = `Hi ${leader.fullName || 'Team Leader'},
+
+We reviewed the UPI reference submitted for your team "${teamName}" (${teamId}), but our organizers were unable to verify the transfer in our bank logs.
+
+Reason:
+${rejectReason}
+
+What to do next:
+Please double-check your UPI transaction receipt from your payment app, and resubmit your 12-digit UTR reference here:
+${ticketLookupUrl}
+
+(Your Team ID ${teamId} and Payment Reference ${paymentRef} remain unchanged. No need to register a new team).
+
+If you have already transferred the ₹300, please upload a clear screenshot of the completed transfer so we can approve it promptly.
+
+Best regards,
+Vulcan Club Organizing Team
+Sender: nexcell_rathinam@msot.org`;
+  } else {
+    subject = `Reminder: Complete your Hack-O-Lantern Registration · Team ${teamId}`;
+    body = `Hi ${leader.fullName || 'Team Leader'},
+
+This is a reminder from Vulcan Club regarding your team "${teamName}" (${teamId}).
+
+Your registration is currently awaiting UPI payment (₹300 for team of 3).
+To confirm your slots before capacity fills, please open the event portal and enter your 12-digit UTR reference:
+${ticketLookupUrl}
+
+Team ID: ${teamId}
+Payment Reference: ${paymentRef}
+
+Best regards,
+Vulcan Club Organizing Team
+Sender: nexcell_rathinam@msot.org`;
+  }
+
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipient)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const mailtoUrl = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  const copyMessage = () => {
+    const textToCopy = `Subject: ${subject}\n\n${body}`;
+    navigator.clipboard?.writeText(textToCopy).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleMarkAsSent = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await api('mark-email-sent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registrationId: registration.id }),
+      });
+      setMarkedSent(true);
+      onActionComplete();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-content email-modal" onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+          <div>
+            <h3>Send Email via Gmail</h3>
+            <p style={{ fontSize: '13px', color: '#b4b4b4', margin: 0 }}>
+              Sender: <strong>nexcell_rathinam@msot.org</strong> · Team: <code>{teamId}</code> ({teamName})
+            </p>
+          </div>
+          <button className="quiet" onClick={onClose} style={{ minHeight: '28px', padding: '0 8px' }}>✕</button>
+        </div>
+
+        <div className="email-template-tabs">
+          <button
+            type="button"
+            className={`email-tab-btn ${templateType === 'confirmed' ? 'is-active' : ''}`}
+            onClick={() => setTemplateType('confirmed')}
+          >
+            Payment Confirmed + Ticket
+          </button>
+          <button
+            type="button"
+            className={`email-tab-btn ${templateType === 'rejected' ? 'is-active' : ''}`}
+            onClick={() => setTemplateType('rejected')}
+          >
+            Payment Rejected + Reason
+          </button>
+          <button
+            type="button"
+            className={`email-tab-btn ${templateType === 'reminder' ? 'is-active' : ''}`}
+            onClick={() => setTemplateType('reminder')}
+          >
+            General Reminder
+          </button>
+        </div>
+
+        <div className="email-preview-box">
+          <div className="email-preview-field">
+            <span>To:</span>
+            <strong>{recipient || '—'}</strong>
+          </div>
+          <div className="email-preview-field">
+            <span>Subject:</span>
+            <strong>{subject}</strong>
+          </div>
+          <div className="email-body-text">{body}</div>
+        </div>
+
+        {error && <p className="form-error" role="alert">{error}</p>}
+
+        <div className="email-actions-bar">
+          <button type="button" className="quiet" onClick={copyMessage}>
+            {copied ? '✓ Message Copied!' : 'Copy message'}
+          </button>
+          <a
+            className="btn-gmail"
+            href={gmailUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ borderRadius: '999px', padding: '0 16px', minHeight: '36px', fontSize: '13px', fontWeight: 600 }}
+          >
+            Open in Gmail ↗
+          </a>
+          <a
+            className="quiet"
+            href={mailtoUrl}
+            style={{ display: 'inline-flex', alignItems: 'center', borderRadius: '999px', padding: '0 12px', fontSize: '12px' }}
+          >
+            Mail app
+          </a>
+          <button
+            type="button"
+            className="btn-sent-mark"
+            onClick={handleMarkAsSent}
+            disabled={busy || markedSent}
+          >
+            {markedSent ? '✓ Marked as sent' : busy ? 'Saving…' : 'Mark as sent'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -56,7 +257,7 @@ function Login({ onSignedIn }) {
       await api('auth-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passcode, email: email.trim() || undefined }),
+        body: JSON.stringify({ passcode, email: email.trim() }),
       });
       onSignedIn();
     } catch (nextError) {
@@ -74,14 +275,15 @@ function Login({ onSignedIn }) {
         <p>Hack-O-Lantern · Organiser access only</p>
         <form onSubmit={submit}>
           <label htmlFor="admin-email">
-            Organiser email (optional)
+            Organiser email (required for audit log)
             <input
               id="admin-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="organiser@msot.org"
+              placeholder="e.g. nexcell_rathinam@msot.org"
               autoComplete="username"
+              required
             />
           </label>
           <label htmlFor="passcode">
@@ -118,43 +320,62 @@ function Dashboard({ stats, onNavigate }) {
         <span className="stat-card__sub">{stats.confirmed || 0} teams confirmed @ ₹300</span>
       </article>
 
-      <article className="stat-card" onClick={() => onNavigate('payments')} style={{ cursor: 'pointer' }}>
+      <article className="stat-card" onClick={() => onNavigate('payments', 'PENDING_REVIEW')} style={{ cursor: 'pointer' }}>
         <span className="stat-card__label">Awaiting review</span>
         <strong className="stat-card__value stat-card__value--warn">{stats.pendingReview || 0}</strong>
         <span className="stat-card__sub">Pending UTR submissions →</span>
       </article>
 
+      <article className="stat-card" onClick={() => onNavigate('payments', 'PENDING_PAYMENT')} style={{ cursor: 'pointer' }}>
+        <span className="stat-card__label">Awaiting payment</span>
+        <strong className="stat-card__value">{stats.pendingPayment || 0}</strong>
+        <span className="stat-card__sub">Registered but no UTR yet →</span>
+      </article>
+
       <article className="stat-card" onClick={() => onNavigate('tickets')} style={{ cursor: 'pointer' }}>
         <span className="stat-card__label">Tickets issued</span>
         <strong className="stat-card__value stat-card__value--valid">{stats.confirmed || 0}</strong>
-        <span className="stat-card__sub">Confirmed entries →</span>
+        <span className="stat-card__sub">Confirmed team passes →</span>
+      </article>
+
+      <article
+        className="stat-card"
+        onClick={() => onNavigate('tickets', '', 'not_sent')}
+        style={{ cursor: 'pointer', borderColor: stats.confirmedEmailNotSent > 0 ? 'rgba(255, 122, 26, 0.4)' : undefined }}
+      >
+        <span className="stat-card__label">Needs Email Sent</span>
+        <strong className="stat-card__value" style={{ color: stats.confirmedEmailNotSent > 0 ? '#ff9a4d' : '#888' }}>
+          {stats.confirmedEmailNotSent || 0}
+        </strong>
+        <span className="stat-card__sub">Confirmed, email not sent →</span>
       </article>
 
       <article className="stat-card" onClick={() => onNavigate('checkin')} style={{ cursor: 'pointer' }}>
         <span className="stat-card__label">Door check-in</span>
         <strong className="stat-card__value">{stats.checkedIn || 0}</strong>
-        <span className="stat-card__sub">Admitted at entrance →</span>
+        <span className="stat-card__sub">Admitted at gate →</span>
       </article>
 
       <article className="stat-card">
         <span className="stat-card__label">Total teams registered</span>
         <strong className="stat-card__value">{stats.total || 0}</strong>
-        <span className="stat-card__sub">{stats.pendingPayment || 0} unpaid · {stats.rejected || 0} rejected</span>
+        <span className="stat-card__sub">{stats.rejected || 0} rejected registrations</span>
       </article>
     </div>
   );
 }
 
 // -------------------------------------------------------------
-// Payments Queue Component (with duplicate UTR & screenshot view)
+// Payments Queue Component
 // -------------------------------------------------------------
-function PaymentQueue({ registrations, onActionComplete }) {
+function PaymentQueue({ registrations, onActionComplete, onOpenEmail }) {
   const [busyId, setBusyId] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [rejectingItem, setRejectingItem] = useState(null);
-  const [rejectReason, setRejectReason] = useState('');
+  const [rejectReason, setRejectReason] = useState('UTR not found in club bank account statement.');
   const [lightboxUrl, setLightboxUrl] = useState('');
+  const [filterMode, setFilterMode] = useState('review'); // 'review' | 'all' | 'unpaid' | 'not_sent'
 
   const approve = async (registration) => {
     setBusyId(registration.id);
@@ -166,8 +387,10 @@ function PaymentQueue({ registrations, onActionComplete }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ registrationId: registration.id }),
       });
-      setNotice(result.message || 'Payment confirmed and ticket email sent.');
+      setNotice(result.message || 'Payment confirmed and ticket generated.');
       onActionComplete();
+      // Prompt admin to send confirmation email
+      onOpenEmail(result.registration || registration, 'confirmed');
     } catch (nextError) {
       setError(nextError.message);
     } finally {
@@ -191,9 +414,11 @@ function PaymentQueue({ registrations, onActionComplete }) {
         }),
       });
       setNotice(result.message || 'Payment rejected.');
+      const itemToEmail = { ...rejectingItem, rejectReason };
       setRejectingItem(null);
-      setRejectReason('');
       onActionComplete();
+      // Prompt admin to send rejection email with reason
+      onOpenEmail(itemToEmail, 'rejected');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -201,50 +426,98 @@ function PaymentQueue({ registrations, onActionComplete }) {
     }
   };
 
+  const filtered = registrations.filter((r) => {
+    if (filterMode === 'review') return r.paymentStatus === 'PENDING_REVIEW';
+    if (filterMode === 'unpaid') return r.paymentStatus === 'PENDING_PAYMENT';
+    if (filterMode === 'not_sent') return r.paymentStatus === 'PAID' && r.emailStatus !== 'sent';
+    return true;
+  });
+
   return (
     <section className="queue">
       <div className="section-head">
         <div>
-          <h2>Payment Review Queue</h2>
+          <h2>Payment Review & Approvals</h2>
           <p>Verify that the 12-digit UTR and amount match club account logs before approving.</p>
         </div>
+      </div>
+
+      <div className="filter-chips">
+        <button
+          type="button"
+          className={`chip-btn ${filterMode === 'review' ? 'is-active' : ''}`}
+          onClick={() => setFilterMode('review')}
+        >
+          Awaiting Review (UTR Submitted)
+        </button>
+        <button
+          type="button"
+          className={`chip-btn ${filterMode === 'unpaid' ? 'is-active' : ''}`}
+          onClick={() => setFilterMode('unpaid')}
+        >
+          Awaiting Payment (No UTR)
+        </button>
+        <button
+          type="button"
+          className={`chip-btn ${filterMode === 'not_sent' ? 'is-active chip-btn--warn' : ''}`}
+          onClick={() => setFilterMode('not_sent')}
+        >
+          Confirmed but Email Not Sent
+        </button>
+        <button
+          type="button"
+          className={`chip-btn ${filterMode === 'all' ? 'is-active' : ''}`}
+          onClick={() => setFilterMode('all')}
+        >
+          All Payments ({registrations.length})
+        </button>
       </div>
 
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="form-notice" role="status">{notice}</p>}
 
-      {registrations.length === 0 ? (
-        <p className="empty">No payment references are currently waiting for review.</p>
+      {filtered.length === 0 ? (
+        <p className="empty">No registrations found in this view.</p>
       ) : (
         <div className="queue__list">
-          {registrations.map((registration) => (
-            <article className="queue-row" key={registration.id}>
+          {filtered.map((r) => (
+            <article className="queue-row" key={r.id}>
               <div className="queue-row__team">
-                <span className="order-badge">{registration.orderRef || 'NO-REF'}</span>
-                <strong>{registration.teamName}</strong>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <span className="order-badge">{r.teamId || r.orderRef}</span>
+                  {r.paymentRef && (
+                    <span style={{ fontSize: '11px', color: '#b4b4b4', fontFamily: 'monospace' }}>
+                      {r.paymentRef}
+                    </span>
+                  )}
+                </div>
+                <strong>{r.teamName}</strong>
                 <span className="members-inline">
-                  {registration.members.map((m) => `${m.fullName} (${m.college})`).join(' · ')}
+                  {r.members.map((m) => `${m.fullName} (${m.college})`).join(' · ')}
                 </span>
-                {registration.duplicateUtr && (
+                {r.duplicateUtr && (
                   <span className="warn-badge">⚠️ Duplicate UTR submitted on multiple teams!</span>
+                )}
+                {r.amount !== 300 && (
+                  <span className="warn-badge">⚠️ Amount mismatch: ₹{r.amount} (expected ₹300)</span>
                 )}
               </div>
 
               <div className="queue-row__utr">
                 <span className="row-label">12-digit UTR</span>
-                <code>{registration.utr || registration.paymentReference}</code>
-                <span className="amount-label">Amount: ₹{registration.amount || 300}</span>
+                <code>{r.utr || <span className="muted-text">None submitted</span>}</code>
+                <span className="amount-label">Status: {statusLabels[r.paymentStatus]}</span>
               </div>
 
               <div className="queue-row__proof">
                 <span className="row-label">Screenshot</span>
-                {registration.screenshotSignedUrl ? (
+                {r.screenshotSignedUrl ? (
                   <button
                     type="button"
                     className="proof-thumb-btn"
-                    onClick={() => setLightboxUrl(registration.screenshotSignedUrl)}
+                    onClick={() => setLightboxUrl(r.screenshotSignedUrl)}
                   >
-                    <img src={registration.screenshotSignedUrl} alt="Receipt proof" />
+                    <img src={r.screenshotSignedUrl} alt="Receipt proof" />
                     <span>View proof</span>
                   </button>
                 ) : (
@@ -253,27 +526,40 @@ function PaymentQueue({ registrations, onActionComplete }) {
               </div>
 
               <div className="queue-row__time">
-                <span className="row-label">Submitted</span>
-                <time>{formatDate(registration.paymentSubmittedAt || registration.createdAt)}</time>
+                <span className="row-label">Email Status</span>
+                <span className={`email-badge email-badge--${r.emailStatus === 'sent' ? 'sent' : 'pending'}`}>
+                  {r.emailStatus === 'sent' ? '✓ Sent' : 'Not sent'}
+                </span>
+                <span className="muted-text" style={{ fontSize: '11px', display: 'block', marginTop: '2px' }}>
+                  {formatDate(r.paymentSubmittedAt || r.createdAt)}
+                </span>
               </div>
 
               <div className="queue-row__actions">
+                {r.paymentStatus !== 'PAID' && (
+                  <button
+                    className="btn-approve"
+                    onClick={() => approve(r)}
+                    disabled={busyId === r.id}
+                  >
+                    {busyId === r.id ? 'Approving…' : 'Confirm & Issue'}
+                  </button>
+                )}
+                {r.paymentStatus !== 'REJECTED' && (
+                  <button
+                    className="btn-reject"
+                    onClick={() => setRejectingItem(r)}
+                    disabled={busyId === r.id}
+                  >
+                    Reject
+                  </button>
+                )}
                 <button
-                  className="btn-approve"
-                  onClick={() => approve(registration)}
-                  disabled={busyId === registration.id}
+                  type="button"
+                  className="table-action"
+                  onClick={() => onOpenEmail(r, r.paymentStatus === 'PAID' ? 'confirmed' : 'reminder')}
                 >
-                  {busyId === registration.id ? 'Approving…' : 'Confirm & Issue Ticket'}
-                </button>
-                <button
-                  className="btn-reject"
-                  onClick={() => {
-                    setRejectingItem(registration);
-                    setRejectReason('UTR not reflected in club account.');
-                  }}
-                  disabled={busyId === registration.id}
-                >
-                  Reject
+                  ✉ Send email
                 </button>
               </div>
             </article>
@@ -283,10 +569,12 @@ function PaymentQueue({ registrations, onActionComplete }) {
 
       {/* Reject Modal */}
       {rejectingItem && (
-        <div className="modal-backdrop">
-          <div className="modal-content">
+        <div className="modal-backdrop" onClick={() => setRejectingItem(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>Reject payment for {rejectingItem.teamName}</h3>
-            <p>The team leader will receive an email with this reason and a link to resubmit their details.</p>
+            <p style={{ fontSize: '13px', color: '#b4b4b4' }}>
+              The Team ID ({rejectingItem.teamId || rejectingItem.orderRef}) and Payment Ref will remain unchanged so the attendee can resubmit their payment reference.
+            </p>
             <form onSubmit={handleRejectSubmit}>
               <label htmlFor="reject-reason">
                 Rejection reason (required)
@@ -326,38 +614,23 @@ function PaymentQueue({ registrations, onActionComplete }) {
 }
 
 // -------------------------------------------------------------
-// Tickets View Component (Resend, Comp, Revoke, Retry)
+// Tickets View Component
 // -------------------------------------------------------------
-function TicketsList({ registrations, onActionComplete }) {
+function TicketsList({ registrations, onActionComplete, onOpenEmail }) {
   const [busyId, setBusyId] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [revokingItem, setRevokingItem] = useState(null);
-  const [revokeReason, setRevokeReason] = useState('');
+  const [revokeReason, setRevokeReason] = useState('Payment reversed or attendee cancelled.');
   const [compTeamId, setCompTeamId] = useState('');
   const [compReason, setCompReason] = useState('Organiser invite / sponsor pass');
   const [showCompModal, setShowCompModal] = useState(false);
+  const [filterEmailNotSent, setFilterEmailNotSent] = useState(false);
 
   const issued = registrations.filter((r) => r.paymentStatus === 'PAID');
-
-  const resend = async (registration) => {
-    setBusyId(registration.id);
-    setError('');
-    setNotice('');
-    try {
-      const res = await api('resend-ticket', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ registrationId: registration.id }),
-      });
-      setNotice(res.message || 'Ticket re-sent.');
-      onActionComplete();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusyId('');
-    }
-  };
+  const displayed = filterEmailNotSent
+    ? issued.filter((r) => r.emailStatus !== 'sent')
+    : issued;
 
   const handleRevoke = async (e) => {
     e.preventDefault();
@@ -375,7 +648,6 @@ function TicketsList({ registrations, onActionComplete }) {
       });
       setNotice('Ticket has been revoked.');
       setRevokingItem(null);
-      setRevokeReason('');
       onActionComplete();
     } catch (err) {
       setError(err.message);
@@ -390,7 +662,7 @@ function TicketsList({ registrations, onActionComplete }) {
     setBusyId('comp');
     setError('');
     try {
-      await api('comp-ticket', {
+      const res = await api('comp-ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -401,21 +673,9 @@ function TicketsList({ registrations, onActionComplete }) {
       setNotice('Complimentary ticket issued.');
       setShowCompModal(false);
       onActionComplete();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusyId('');
-    }
-  };
-
-  const retryFailed = async () => {
-    setBusyId('retry');
-    setError('');
-    setNotice('');
-    try {
-      const res = await api('retry-failed-emails', { method: 'POST' });
-      setNotice(res.message);
-      onActionComplete();
+      if (res.registration) {
+        onOpenEmail(res.registration, 'confirmed');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -431,8 +691,11 @@ function TicketsList({ registrations, onActionComplete }) {
           <p>Official passes with tamper-proof QR codes admitted at entrance.</p>
         </div>
         <div className="section-head__actions">
-          <button className="quiet" onClick={retryFailed} disabled={busyId === 'retry'}>
-            {busyId === 'retry' ? 'Retrying…' : 'Retry failed emails'}
+          <button
+            className={`chip-btn ${filterEmailNotSent ? 'is-active chip-btn--warn' : ''}`}
+            onClick={() => setFilterEmailNotSent(!filterEmailNotSent)}
+          >
+            {filterEmailNotSent ? 'Show All Tickets' : 'Filter: Email Not Sent'}
           </button>
           <button onClick={() => setShowCompModal(true)}>
             + Issue comp ticket
@@ -443,15 +706,16 @@ function TicketsList({ registrations, onActionComplete }) {
       {error && <p className="form-error" role="alert">{error}</p>}
       {notice && <p className="form-notice" role="status">{notice}</p>}
 
-      {issued.length === 0 ? (
-        <p className="empty">No tickets have been confirmed yet.</p>
+      {displayed.length === 0 ? (
+        <p className="empty">No tickets matching this filter.</p>
       ) : (
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
+                <th>Team ID</th>
                 <th>Ticket ID</th>
-                <th>Order Ref</th>
+                <th>Payment Ref</th>
                 <th>Team & Leader</th>
                 <th>Email Status</th>
                 <th>Entry</th>
@@ -459,25 +723,33 @@ function TicketsList({ registrations, onActionComplete }) {
               </tr>
             </thead>
             <tbody>
-              {issued.map((r) => (
+              {displayed.map((r) => (
                 <tr key={r.id}>
                   <td>
-                    <code className="code--green">{r.ticketId}</code>
+                    <code className="order-badge">{r.teamId || r.orderRef}</code>
                     {r.isComp && <span className="comp-tag">COMP</span>}
                   </td>
-                  <td><code>{r.orderRef || '—'}</code></td>
+                  <td><code className="code--green">{r.ticketId}</code></td>
+                  <td><code>{r.paymentRef || '—'}</code></td>
                   <td>
                     <strong>{r.teamName}</strong>
                     <span className="muted-text">{r.members[0]?.email}</span>
                   </td>
                   <td>
-                    <span className={`email-badge email-badge--${r.emailStatus || 'pending'}`}>
-                      {r.emailStatus || 'pending'} ({r.emailSentCount || 0} sent)
+                    <span className={`email-badge email-badge--${r.emailStatus === 'sent' ? 'sent' : 'pending'}`}>
+                      {r.emailStatus === 'sent' ? `Sent (${r.emailSentCount || 1}x)` : 'Not sent'}
                     </span>
+                    {r.emailSentBy && (
+                      <span className="muted-text" style={{ fontSize: '11px', display: 'block' }}>
+                        by {r.emailSentBy}
+                      </span>
+                    )}
                   </td>
                   <td>
                     {r.checkedInAt ? (
-                      <span className="checked-badge">✓ Admitted {new Date(r.checkedInAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span className="checked-badge">
+                        ✓ Admitted {new Date(r.checkedInAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
                     ) : (
                       <span className="muted-text">Not checked in</span>
                     )}
@@ -486,10 +758,9 @@ function TicketsList({ registrations, onActionComplete }) {
                     <div className="inline-actions">
                       <button
                         className="table-action"
-                        onClick={() => resend(r)}
-                        disabled={busyId === r.id}
+                        onClick={() => onOpenEmail(r, 'confirmed')}
                       >
-                        {busyId === r.id ? 'Sending…' : 'Resend'}
+                        ✉ Send email
                       </button>
                       <button
                         className="table-action table-action--danger"
@@ -512,8 +783,8 @@ function TicketsList({ registrations, onActionComplete }) {
 
       {/* Revoke Modal */}
       {revokingItem && (
-        <div className="modal-backdrop">
-          <div className="modal-content">
+        <div className="modal-backdrop" onClick={() => setRevokingItem(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>Revoke ticket {revokingItem.ticketId}</h3>
             <p>Revoking this ticket invalidates its QR code. Gate scanners will block entry.</p>
             <form onSubmit={handleRevoke}>
@@ -542,8 +813,8 @@ function TicketsList({ registrations, onActionComplete }) {
 
       {/* Issue Comp Modal */}
       {showCompModal && (
-        <div className="modal-backdrop">
-          <div className="modal-content">
+        <div className="modal-backdrop" onClick={() => setShowCompModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>Issue Complimentary Ticket</h3>
             <p>Select any registered team to issue a confirmed ticket without requiring a UPI payment.</p>
             <form onSubmit={handleIssueComp}>
@@ -560,7 +831,7 @@ function TicketsList({ registrations, onActionComplete }) {
                     .filter((r) => r.paymentStatus !== 'PAID')
                     .map((r) => (
                       <option key={r.id} value={r.id}>
-                        {r.teamName} ({r.orderRef || r.id}) - {statusLabels[r.paymentStatus]}
+                        {r.teamName} ({r.teamId || r.orderRef || r.id}) - {statusLabels[r.paymentStatus]}
                       </option>
                     ))}
                 </select>
@@ -645,9 +916,7 @@ function TicketScan({ onCheckedIn }) {
         html5QrcodeScanner.clear().catch(console.warn);
         setScannerActive(false);
       },
-      (err) => {
-        // Continuous scanning errors are normal while frame does not contain a QR
-      }
+      () => {}
     );
 
     return () => {
@@ -660,7 +929,7 @@ function TicketScan({ onCheckedIn }) {
       <div className="section-head">
         <div>
           <h2>Door Check-in Desk</h2>
-          <p>Scan attendee QR pass or enter their Ticket ID / Order Ref.</p>
+          <p>Scan attendee QR pass or enter their Team ID / Ticket Token.</p>
         </div>
       </div>
 
@@ -682,12 +951,12 @@ function TicketScan({ onCheckedIn }) {
 
         <form onSubmit={(e) => { e.preventDefault(); checkIn(); }}>
           <label htmlFor="ticket-id">
-            Ticket ID / Token / Order Ref
+            Team ID / Ticket Token / Ticket ID
             <input
               id="ticket-id"
               value={ticketId}
               onChange={(e) => setTicketId(e.target.value)}
-              placeholder="e.g. VULCAN-XXXX-XXXX or VLC-XXXXXX"
+              placeholder="e.g. VHK-1001 or VULCAN-XXXX-XXXX"
               autoCapitalize="characters"
             />
           </label>
@@ -720,7 +989,10 @@ function CheckinResult({ result }) {
       {result.registration && (
         <div className="checkin-result__details">
           <h3>{result.registration.teamName}</h3>
-          <p>Order: <code>{result.registration.orderRef || '—'}</code> · Ticket: <code>{result.registration.ticketId}</code></p>
+          <p>
+            Team ID: <code>{result.registration.teamId || result.registration.orderRef}</code> ·
+            Ticket: <code>{result.registration.ticketId}</code>
+          </p>
           <ul className="checkin-members">
             {result.registration.members.map((m) => (
               <li key={m.id || m.position}>
@@ -736,14 +1008,15 @@ function CheckinResult({ result }) {
 }
 
 // -------------------------------------------------------------
-// Registrations Table & Attendee Editor Component
+// Registrations Table & Bulk Helper Component
 // -------------------------------------------------------------
-function RegistrationTable({ registrations, search, setSearch, status, setStatus, onActionComplete }) {
+function RegistrationTable({ registrations, search, setSearch, status, setStatus, onActionComplete, onOpenEmail }) {
   const [editingMember, setEditingMember] = useState(null);
   const [memberForm, setMemberForm] = useState({ fullName: '', college: '', email: '', phone: '' });
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState('');
   const [notice, setNotice] = useState('');
+  const [copiedBulk, setCopiedBulk] = useState('');
 
   const openEdit = (member) => {
     setEditingMember(member);
@@ -780,21 +1053,44 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
     }
   };
 
+  const copyEmailsByStatus = (statusToCopy) => {
+    const matching = registrations.filter((r) => !statusToCopy || r.paymentStatus === statusToCopy);
+    const emails = matching
+      .flatMap((r) => r.members.map((m) => m.email))
+      .filter(Boolean);
+    const unique = Array.from(new Set(emails));
+
+    navigator.clipboard?.writeText(unique.join(', ')).then(() => {
+      setCopiedBulk(`Copied ${unique.length} emails!`);
+      setTimeout(() => setCopiedBulk(''), 2500);
+    });
+  };
+
   return (
     <section className="registrations">
       <div className="section-head">
         <div>
           <h2>All Teams ({registrations.length})</h2>
-          <p>Search team, attendee, college, reference, UTR, or ticket ID.</p>
+          <p>Search Team ID, Payment Ref, attendee, college, UTR, or ticket ID.</p>
         </div>
-        <a className="export" href="/api/export">Export CSV ↗</a>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="quiet"
+            onClick={() => copyEmailsByStatus(status)}
+            style={{ fontSize: '12px', minHeight: '32px' }}
+          >
+            {copiedBulk || '📋 Copy attendee emails'}
+          </button>
+          <a className="export" href="/api/export">Export CSV ↗</a>
+        </div>
       </div>
 
       <div className="table-tools">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search registrations…"
+          placeholder="Search team, ID, UTR, email…"
           aria-label="Search registrations"
         />
         <select
@@ -818,19 +1114,21 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
           <table>
             <thead>
               <tr>
-                <th>Order Ref</th>
+                <th>Team ID</th>
+                <th>Payment Ref</th>
                 <th>Team</th>
                 <th>Status</th>
                 <th>UTR Reference</th>
                 <th>Ticket ID</th>
                 <th>Members & Colleges</th>
-                <th>Entry</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {registrations.map((r) => (
                 <tr key={r.id}>
-                  <td><code>{r.orderRef || '—'}</code></td>
+                  <td><code className="order-badge">{r.teamId || r.orderRef}</code></td>
+                  <td><code>{r.paymentRef || '—'}</code></td>
                   <td>
                     <strong>{r.teamName}</strong>
                     <span className="muted-text">{formatDate(r.createdAt)}</span>
@@ -863,7 +1161,15 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
                       </div>
                     ))}
                   </td>
-                  <td>{r.checkedInAt ? formatDate(r.checkedInAt) : '—'}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="table-action"
+                      onClick={() => onOpenEmail(r, r.paymentStatus === 'PAID' ? 'confirmed' : 'reminder')}
+                    >
+                      ✉ Email
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -873,8 +1179,8 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
 
       {/* Edit Attendee Modal */}
       {editingMember && (
-        <div className="modal-backdrop">
-          <div className="modal-content">
+        <div className="modal-backdrop" onClick={() => setEditingMember(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>Edit Attendee Details</h3>
             <form onSubmit={handleEditSubmit}>
               <label htmlFor="edit-name">
@@ -932,6 +1238,173 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
 }
 
 // -------------------------------------------------------------
+// Settings Page Component (Section 1)
+// -------------------------------------------------------------
+function SettingsView({ onActionComplete }) {
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const loadSettings = useCallback(async () => {
+    try {
+      const data = await api('settings');
+      setSettings(data.settings);
+      setError('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      const result = await api('settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+      setNotice(result.message || 'Settings saved successfully.');
+      setSettings(result.settings);
+      onActionComplete();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <p className="loading">Loading settings…</p>;
+
+  return (
+    <section className="settings-section">
+      <div className="section-head">
+        <div>
+          <h2>Event Configuration & Registration Control</h2>
+          <p>Controls event capacity, ticket price, UPI payee ID, and public registration state.</p>
+        </div>
+      </div>
+
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {notice && <p className="form-notice" role="status">{notice}</p>}
+
+      <form onSubmit={handleSubmit} className="settings-grid">
+        <div className="settings-card">
+          <h3>Registration Status</h3>
+          <div className="toggle-row">
+            <span>Open for new registrations:</span>
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={Boolean(settings?.registrationsOpen)}
+                onChange={(e) => setSettings({ ...settings, registrationsOpen: e.target.checked })}
+              />
+              <span className="toggle-slider" />
+            </label>
+          </div>
+          <small style={{ color: settings?.registrationsOpen ? '#c6f24e' : '#ff9aa0' }}>
+            {settings?.registrationsOpen ? '● Public registration is ACTIVE' : '○ Registration is PAUSED / CLOSED'}
+          </small>
+
+          <label htmlFor="capacity-input" style={{ marginTop: '12px' }}>
+            Maximum Team Capacity
+            <input
+              id="capacity-input"
+              type="number"
+              min="1"
+              max="5000"
+              value={settings?.maxCapacity || 100}
+              onChange={(e) => setSettings({ ...settings, maxCapacity: Number(e.target.value) })}
+              required
+            />
+          </label>
+        </div>
+
+        <div className="settings-card">
+          <h3>Payment & Pricing</h3>
+          <label htmlFor="price-input">
+            Team Ticket Price (INR)
+            <input
+              id="price-input"
+              type="number"
+              min="0"
+              value={settings?.ticketPrice || 300}
+              onChange={(e) => setSettings({ ...settings, ticketPrice: Number(e.target.value) })}
+              required
+            />
+          </label>
+
+          <label htmlFor="upi-input">
+            Payee UPI VPA ID
+            <input
+              id="upi-input"
+              type="text"
+              value={settings?.upiId || 'himangshuyadav2@oksbi'}
+              onChange={(e) => setSettings({ ...settings, upiId: e.target.value })}
+              required
+            />
+          </label>
+        </div>
+
+        <div className="settings-card" style={{ gridColumn: '1 / -1' }}>
+          <h3>Event Details</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+            <label htmlFor="event-name-input">
+              Event Name
+              <input
+                id="event-name-input"
+                type="text"
+                value={settings?.eventName || 'Hack-O-Lantern'}
+                onChange={(e) => setSettings({ ...settings, eventName: e.target.value })}
+                required
+              />
+            </label>
+
+            <label htmlFor="event-date-input">
+              Event Date & Timing
+              <input
+                id="event-date-input"
+                type="text"
+                value={settings?.eventDate || '31 Oct 2026, 7:00 PM – 1 Nov 2026, 7:00 AM'}
+                onChange={(e) => setSettings({ ...settings, eventDate: e.target.value })}
+                required
+              />
+            </label>
+
+            <label htmlFor="event-venue-input">
+              Venue
+              <input
+                id="event-venue-input"
+                type="text"
+                value={settings?.eventVenue || 'Mirai Floor, Bengaluru'}
+                onChange={(e) => setSettings({ ...settings, eventVenue: e.target.value })}
+                required
+              />
+            </label>
+          </div>
+
+          <div className="modal-actions" style={{ marginTop: '16px' }}>
+            <button type="submit" disabled={saving}>
+              {saving ? 'Saving changes…' : 'Save Event Settings'}
+            </button>
+          </div>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+// -------------------------------------------------------------
 // Main App Component with Tabs
 // -------------------------------------------------------------
 export default function App() {
@@ -943,6 +1416,8 @@ export default function App() {
   const [totals, setTotals] = useState({});
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [emailModalItem, setEmailModalItem] = useState(null);
+  const [emailModalType, setEmailModalType] = useState('confirmed');
   const [loadError, setLoadError] = useState('');
 
   const load = useCallback(async () => {
@@ -981,7 +1456,7 @@ export default function App() {
   useEffect(() => {
     const handleHash = () => {
       const h = window.location.hash.replace('#', '');
-      if (['dashboard', 'payments', 'tickets', 'checkin', 'teams'].includes(h)) {
+      if (['dashboard', 'payments', 'tickets', 'checkin', 'teams', 'settings'].includes(h)) {
         setTab(h);
       }
     };
@@ -990,9 +1465,10 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHash);
   }, []);
 
-  const changeTab = (nextTab) => {
+  const changeTab = (nextTab, nextStatus = '') => {
     setTab(nextTab);
     window.location.hash = nextTab;
+    if (nextStatus !== undefined) setStatus(nextStatus);
   };
 
   const logout = async () => {
@@ -1001,10 +1477,13 @@ export default function App() {
     setAdminUser(null);
   };
 
+  const openEmailModal = (reg, type = 'confirmed') => {
+    setEmailModalItem(reg);
+    setEmailModalType(type);
+  };
+
   if (authenticated === null) return <main className="loading">Loading operations console…</main>;
   if (!authenticated) return <Login onSignedIn={() => setAuthenticated(true)} />;
-
-  const paymentReview = registrations.filter((r) => r.paymentStatus === 'PENDING_REVIEW');
 
   return (
     <div className="app-shell">
@@ -1023,7 +1502,7 @@ export default function App() {
             className={tab === 'payments' ? 'is-active' : ''}
             onClick={() => changeTab('payments')}
           >
-            Payment review <span>{totals.PENDING_REVIEW || 0}</span>
+            Payments <span>{totals.PENDING_REVIEW || 0}</span>
           </a>
           <a
             href="#tickets"
@@ -1046,6 +1525,13 @@ export default function App() {
           >
             All teams <span>{registrations.length}</span>
           </a>
+          <a
+            href="#settings"
+            className={tab === 'settings' ? 'is-active' : ''}
+            onClick={() => changeTab('settings')}
+          >
+            Settings
+          </a>
         </nav>
 
         <div className="aside-footer">
@@ -1063,20 +1549,32 @@ export default function App() {
         <div className="page-title">
           <div>
             <h1>Event Operations</h1>
-            <p>Real-time payments, ticketing, and gate check-in desk.</p>
+            <p>Real-time payments, ticketing, manual email dispatch, and gate check-in desk.</p>
           </div>
           <div className="counts">
             <span><b>{totals.PENDING_REVIEW || 0}</b> awaiting review</span>
             <span><b>{totals.PAID || 0}</b> tickets issued</span>
-            <span><b>{stats.checkedIn || 0}</b> checked in</span>
+            <span><b>{stats.checkedIn || 0}</b> admitted</span>
           </div>
         </div>
 
         {loadError && <p className="form-error" role="alert">{loadError}</p>}
 
         {tab === 'dashboard' && <Dashboard stats={stats} onNavigate={changeTab} />}
-        {tab === 'payments' && <PaymentQueue registrations={paymentReview} onActionComplete={load} />}
-        {tab === 'tickets' && <TicketsList registrations={registrations} onActionComplete={load} />}
+        {tab === 'payments' && (
+          <PaymentQueue
+            registrations={registrations}
+            onActionComplete={load}
+            onOpenEmail={openEmailModal}
+          />
+        )}
+        {tab === 'tickets' && (
+          <TicketsList
+            registrations={registrations}
+            onActionComplete={load}
+            onOpenEmail={openEmailModal}
+          />
+        )}
         {tab === 'checkin' && <TicketScan onCheckedIn={load} />}
         {tab === 'teams' && (
           <RegistrationTable
@@ -1086,9 +1584,21 @@ export default function App() {
             status={status}
             setStatus={setStatus}
             onActionComplete={load}
+            onOpenEmail={openEmailModal}
           />
         )}
+        {tab === 'settings' && <SettingsView onActionComplete={load} />}
       </main>
+
+      {/* Manual Email Modal */}
+      {emailModalItem && (
+        <ManualEmailModal
+          registration={emailModalItem}
+          initialType={emailModalType}
+          onClose={() => setEmailModalItem(null)}
+          onActionComplete={load}
+        />
+      )}
     </div>
   );
 }
