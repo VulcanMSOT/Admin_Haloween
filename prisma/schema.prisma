@@ -1,0 +1,53 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PaymentStatus {
+  PENDING_PAYMENT
+  PENDING_REVIEW
+  PAID
+  REJECTED
+  EXPIRED
+}
+
+model Registration {
+  id                 String        @id @default(cuid())
+  ticketId           String?       @unique @db.VarChar(32)
+  teamName           String        @db.VarChar(40)
+  normalizedTeamName String        @unique @db.VarChar(40)
+  createdAt          DateTime      @default(now())
+  paymentStatus      PaymentStatus @default(PENDING_PAYMENT)
+  paymentReference   String?       @unique @db.VarChar(100)
+  paymentTokenHash   String?       @unique @db.VarChar(64)
+  paymentSubmittedAt DateTime?
+  paymentApprovedAt  DateTime?
+  paymentApprovedBy  String?       @db.VarChar(100)
+  paymentNote        String?       @db.VarChar(500)
+  checkedInAt        DateTime?
+  members            TeamMember[]
+
+  @@index([createdAt])
+  @@index([checkedInAt])
+  @@index([paymentStatus, createdAt])
+}
+
+model TeamMember {
+  id              String       @id @default(cuid())
+  registrationId  String
+  registration    Registration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  position        Int
+  fullName        String       @db.VarChar(100)
+  email           String       @db.VarChar(254)
+  normalizedEmail String       @unique @db.VarChar(254)
+  phone           String       @db.VarChar(16)
+  normalizedPhone String       @unique @db.VarChar(10)
+  college         String       @db.VarChar(80)
+
+  @@unique([registrationId, position])
+  @@index([college])
+  @@index([registrationId])
+}
