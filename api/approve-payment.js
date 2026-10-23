@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { json, methodNotAllowed, parseBody } from './_lib/http.js';
 import { prisma } from './_lib/prisma.js';
 import { requireSession } from './_lib/session.js';
+import { sendAndRecordTicketEmail } from './_lib/ticket-email.js';
 
 function ticketId() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -25,7 +26,14 @@ export default async function handler(request, response) {
       });
     });
     if (!registration) return json(response, 409, { error: 'This payment is no longer waiting for review.' });
-    return json(response, 200, { registration });
+    let email;
+    try {
+      email = await sendAndRecordTicketEmail(registration);
+    } catch (error) {
+      console.error('Ticket email error', error);
+      email = { sent: false, error: 'The payment was approved, but the ticket email could not be sent.' };
+    }
+    return json(response, 200, { registration, email });
   } catch (error) {
     console.error('Payment approval error', error);
     return json(response, 500, { error: 'Could not approve this payment.' });

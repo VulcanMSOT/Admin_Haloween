@@ -4,3 +4,4 @@
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
 
 .brand__mark { display: grid; place-items: center; width: 28px; height: 28px; background: #fff; color: #000; font-family: Georgia, serif; font-weight: 700; }
+.form-notice { color: #c6f24e; font-size: 14px; }

@@ -27,6 +27,9 @@ model Registration {
   paymentApprovedAt  DateTime?
   paymentApprovedBy  String?       @db.VarChar(100)
   paymentNote        String?       @db.VarChar(500)
+  ticketEmailSentAt  DateTime?
+  ticketEmailError   String?       @db.VarChar(500)
+  ticketEmailId      String?       @db.VarChar(100)
   checkedInAt        DateTime?
   members            TeamMember[]
 
