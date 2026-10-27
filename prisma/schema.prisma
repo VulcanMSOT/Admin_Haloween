@@ -20,6 +20,10 @@ model Registration {
   paymentRef         String?       @unique @db.VarChar(32)
   orderRef           String?       @unique @db.VarChar(32)
   amount             Int           @default(300)
+  listPrice          Int           @default(300) @map("list_price")
+  couponCode         String?       @map("coupon_code") @db.VarChar(32)
+  discountAmount     Int           @default(0) @map("discount_amount")
+  amountReceived     Int?          @map("amount_received")
   ticketId           String?       @unique @db.VarChar(32)
   ticketToken        String?       @unique @db.VarChar(64)
   teamName           String        @db.VarChar(40)
@@ -58,19 +62,35 @@ model Registration {
   @@index([teamId])
   @@index([paymentRef])
   @@index([emailStatus])
+  @@index([couponCode])
+}
+
+model Coupon {
+  id        String    @id @default(cuid())
+  code      String    @unique @db.VarChar(32)
+  type      String    @default("flat") @db.VarChar(16)
+  value     Int
+  active    Boolean   @default(true)
+  maxUses   Int?      @map("max_uses")
+  usedCount Int       @default(0) @map("used_count")
+  expiresAt DateTime? @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@map("coupons")
 }
 
 model EventSettings {
-  id                String    @id @default("default") @db.VarChar(64)
-  eventName         String    @default("Hack-O-Lantern") @map("event_name") @db.VarChar(128)
-  eventDate         String    @default("31 Oct 2026, 7:00 PM – 1 Nov 2026, 7:00 AM") @map("event_date") @db.VarChar(255)
-  eventVenue        String    @default("Mirai Floor, Bengaluru") @map("event_venue") @db.VarChar(255)
+  id                String    @id @default("default")
+  eventName         String    @default("Hack-O-Lantern") @map("event_name")
+  eventDate         String    @default("31 Oct 2026, 7:00 PM – 1 Nov 2026, 7:00 AM") @map("event_date")
+  eventVenue        String    @default("Mirai Floor, Bengaluru") @map("event_venue")
   registrationsOpen Boolean   @default(true) @map("registrations_open")
   opensAt           DateTime? @map("opens_at")
   closesAt          DateTime? @map("closes_at")
   maxCapacity       Int       @default(100) @map("max_capacity")
   ticketPrice       Int       @default(300) @map("ticket_price")
-  upiId             String    @default("himangshuyadav2@oksbi") @map("upi_id") @db.VarChar(128)
+  upiId             String    @default("himangshuyadav2@oksbi") @map("upi_id")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
 
