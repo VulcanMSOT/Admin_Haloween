@@ -379,6 +379,150 @@ function Dashboard({ stats, onNavigate }) {
 }
 
 // -------------------------------------------------------------
+// Delete Team Confirmation Modal
+// -------------------------------------------------------------
+function DeleteTeamModal({ team, onClose, onDeleted }) {
+  const [reason, setReason] = useState('Duplicate or test registration');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!team) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const result = await api('delete-team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          registrationId: team.id,
+          reason: reason.trim() || 'Deleted by admin',
+        }),
+      });
+      onDeleted(result.message || `Team "${team.teamName}" deleted permanently.`);
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Could not delete team.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={() => !busy && onClose()}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+          <span style={{ fontSize: '26px' }} role="img" aria-label="warning">⚠️</span>
+          <div>
+            <h3 style={{ margin: 0, color: '#ff8888', fontSize: '18px' }}>Delete Team Permanently</h3>
+            <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#888' }}>
+              Database records & credentials will be destroyed
+            </p>
+          </div>
+        </div>
+
+        <p style={{ fontSize: '13px', color: '#ccc', lineHeight: '1.5', margin: '0 0 14px' }}>
+          Are you sure you want to delete <strong style={{ color: '#fff' }}>{team.teamName}</strong> (<code>{team.teamId || team.orderRef}</code>)?
+          This action is <strong style={{ color: '#ff8888' }}>permanent and cannot be undone</strong>.
+        </p>
+
+        <div style={{
+          background: 'rgba(255, 70, 70, 0.08)',
+          border: '1px solid rgba(255, 70, 70, 0.25)',
+          borderRadius: '8px',
+          padding: '12px 14px',
+          fontSize: '12px',
+          color: '#ffa0a0',
+          marginBottom: '16px',
+          lineHeight: '1.45',
+        }}>
+          <strong>What will happen:</strong>
+          <ul style={{ margin: '6px 0 0', paddingLeft: '18px' }}>
+            <li>The registration and all {team.members?.length || 3} member profiles will be wiped.</li>
+            <li>Members' emails and phone numbers will be released for fresh registration.</li>
+            {team.paymentStatus === 'PAID' && team.couponCode && (
+              <li>Coupon <code>{team.couponCode}</code> usage count will be refunded/restored.</li>
+            )}
+            {team.ticketId && (
+              <li>Issued ticket <code>{team.ticketId}</code> will be permanently destroyed.</li>
+            )}
+          </ul>
+        </div>
+
+        <div className="pricing-summary-card" style={{ marginBottom: '16px' }}>
+          <div className="summary-line">
+            <span>Team:</span>
+            <strong style={{ color: '#fff' }}>{team.teamName}</strong>
+          </div>
+          <div className="summary-line">
+            <span>Team ID:</span>
+            <code>{team.teamId || team.orderRef}</code>
+          </div>
+          <div className="summary-line">
+            <span>Payment Status:</span>
+            <span className={`status status--${team.paymentStatus?.toLowerCase()}`}>
+              {statusLabels[team.paymentStatus] || team.paymentStatus}
+            </span>
+          </div>
+          {team.utr && (
+            <div className="summary-line">
+              <span>UTR:</span>
+              <code>{team.utr}</code>
+            </div>
+          )}
+          {team.members && team.members.length > 0 && (
+            <div className="summary-line" style={{ display: 'block', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <span style={{ display: 'block', marginBottom: '4px', fontSize: '11px', color: '#888' }}>Members:</span>
+              {team.members.map((m) => (
+                <div key={m.id || m.position} style={{ fontSize: '11px', color: '#bbb', padding: '1px 0' }}>
+                  • {m.fullName} ({m.college || '—'}) · {m.email}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {error && <p className="form-error" role="alert" style={{ marginBottom: '12px' }}>{error}</p>}
+
+        <form onSubmit={handleSubmit}>
+          <label htmlFor="delete-reason" style={{ fontSize: '12px', display: 'block', marginBottom: '6px' }}>
+            Reason for deletion (recorded in Audit Log)
+            <input
+              id="delete-reason"
+              type="text"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Duplicate test registration, cancelled by student lead"
+              style={{ width: '100%', marginTop: '4px' }}
+            />
+          </label>
+
+          <div className="modal-actions" style={{ marginTop: '20px' }}>
+            <button
+              type="button"
+              className="quiet"
+              onClick={onClose}
+              disabled={busy}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-danger"
+              disabled={busy}
+            >
+              {busy ? 'Deleting Team…' : 'Yes, Delete Team'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
 // Payments Queue Component
 // -------------------------------------------------------------
 function PaymentQueue({ registrations, onActionComplete, onOpenEmail }) {
@@ -388,6 +532,7 @@ function PaymentQueue({ registrations, onActionComplete, onOpenEmail }) {
   const [rejectingItem, setRejectingItem] = useState(null);
   const [rejectReason, setRejectReason] = useState('UTR not found in club bank account statement.');
   const [approvingItem, setApprovingItem] = useState(null);
+  const [deletingTeam, setDeletingTeam] = useState(null);
   const [amountReceivedInput, setAmountReceivedInput] = useState('');
   const [approveNote, setApproveNote] = useState('');
   const [couponCodeSearch, setCouponCodeSearch] = useState('');
@@ -644,6 +789,15 @@ function PaymentQueue({ registrations, onActionComplete, onOpenEmail }) {
                 >
                   ✉ Send email
                 </button>
+                <button
+                  type="button"
+                  className="table-action table-action--danger"
+                  onClick={() => setDeletingTeam(r)}
+                  disabled={busyId === r.id}
+                  title={`Delete team ${r.teamName}`}
+                >
+                  🗑 Delete
+                </button>
               </div>
             </article>
           ))}
@@ -770,6 +924,18 @@ function PaymentQueue({ registrations, onActionComplete, onOpenEmail }) {
           </div>
         </div>
       )}
+
+      {/* Delete Team Confirmation Modal */}
+      {deletingTeam && (
+        <DeleteTeamModal
+          team={deletingTeam}
+          onClose={() => setDeletingTeam(null)}
+          onDeleted={(msg) => {
+            setNotice(msg);
+            onActionComplete();
+          }}
+        />
+      )}
     </section>
   );
 }
@@ -786,6 +952,7 @@ function TicketsList({ registrations, onActionComplete, onOpenEmail }) {
   const [compTeamId, setCompTeamId] = useState('');
   const [compReason, setCompReason] = useState('Organiser invite / sponsor pass');
   const [showCompModal, setShowCompModal] = useState(false);
+  const [deletingTeam, setDeletingTeam] = useState(null);
   const [filterEmailNotSent, setFilterEmailNotSent] = useState(false);
 
   const issued = registrations.filter((r) => r.paymentStatus === 'PAID');
@@ -933,6 +1100,15 @@ function TicketsList({ registrations, onActionComplete, onOpenEmail }) {
                       >
                         Revoke
                       </button>
+                      <button
+                        type="button"
+                        className="table-action table-action--danger"
+                        onClick={() => setDeletingTeam(r)}
+                        disabled={busyId === r.id}
+                        title={`Delete team ${r.teamName}`}
+                      >
+                        🗑 Delete
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1018,6 +1194,18 @@ function TicketsList({ registrations, onActionComplete, onOpenEmail }) {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Delete Team Confirmation Modal */}
+      {deletingTeam && (
+        <DeleteTeamModal
+          team={deletingTeam}
+          onClose={() => setDeletingTeam(null)}
+          onDeleted={(msg) => {
+            setNotice(msg);
+            onActionComplete();
+          }}
+        />
       )}
     </section>
   );
@@ -1180,6 +1368,7 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
   const [copiedBulk, setCopiedBulk] = useState('');
 
   const [changingAmountItem, setChangingAmountItem] = useState(null);
+  const [deletingTeam, setDeletingTeam] = useState(null);
   const [changeAmountForm, setChangeAmountForm] = useState({ listPrice: 300, couponCode: '', discountAmount: 0, amount: 300, reason: '' });
   const [changeAmountBusy, setChangeAmountBusy] = useState(false);
   const [changeAmountError, setChangeAmountError] = useState('');
@@ -1403,6 +1592,14 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
                       >
                         ✉ Email
                       </button>
+                      <button
+                        type="button"
+                        className="table-action table-action--danger"
+                        onClick={() => setDeletingTeam(r)}
+                        title={`Delete team ${r.teamName}`}
+                      >
+                        🗑 Delete team
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1562,6 +1759,18 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
             </form>
           </div>
         </div>
+      )}
+
+      {/* Delete Team Confirmation Modal */}
+      {deletingTeam && (
+        <DeleteTeamModal
+          team={deletingTeam}
+          onClose={() => setDeletingTeam(null)}
+          onDeleted={(msg) => {
+            setNotice(msg);
+            onActionComplete();
+          }}
+        />
       )}
     </section>
   );

@@ -103,6 +103,9 @@ time { color: #b4b4b4; font-size: 13px; }
 .btn-approve:hover { opacity: 0.9; }
 .btn-reject { background: rgba(255, 70, 70, 0.15); color: #ff8888; border: 1px solid rgba(255, 70, 70, 0.3); font-weight: 600; font-size: 13px; padding: 8px 16px; border-radius: 999px; cursor: pointer; }
 .btn-reject:hover { background: rgba(255, 70, 70, 0.25); color: #ffa0a0; }
+.btn-danger { background: #e53e3e; color: #fff; border: 1px solid #c53030; font-weight: 600; font-size: 13px; padding: 8px 16px; border-radius: 999px; cursor: pointer; transition: background 150ms ease, opacity 150ms ease; }
+.btn-danger:hover { background: #c53030; }
+.btn-danger:disabled { opacity: 0.55; cursor: not-allowed; }
 .queue-row__actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .quiet { background: transparent; color: #fff; border: 1px solid #444; }
 .inline-actions { display: flex; gap: 6px; }
