@@ -26,6 +26,14 @@ export default async function handler(request, response) {
 
     if (!existing) return json(response, 404, { error: 'Registration not found.' });
 
+    // If revoking an already confirmed payment that used a coupon, decrement coupon usedCount
+    if (existing.paymentStatus === 'PAID' && existing.couponCode) {
+      await prisma.coupon.updateMany({
+        where: { code: existing.couponCode, usedCount: { gt: 0 } },
+        data: { usedCount: { decrement: 1 } },
+      });
+    }
+
     const updated = await prisma.registration.update({
       where: { id: existing.id },
       data: {

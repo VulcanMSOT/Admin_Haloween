@@ -103,7 +103,7 @@ ${ticketLookupUrl}
 
 (Your Team ID ${teamId} and Payment Reference ${paymentRef} remain unchanged. No need to register a new team).
 
-If you have already transferred the ₹300, please upload a clear screenshot of the completed transfer so we can approve it promptly.
+If you have already transferred the ₹${registration.amount || 300}, please upload a clear screenshot of the completed transfer so we can approve it promptly.
 
 Best regards,
 Vulcan Club Organizing Team
@@ -114,7 +114,7 @@ Sender: nexcell_rathinam@msot.org`;
 
 This is a reminder from Vulcan Club regarding your team "${teamName}" (${teamId}).
 
-Your registration is currently awaiting UPI payment (₹300 for team of 3).
+Your registration is currently awaiting UPI payment (₹${registration.amount || 300} for team of 3).
 To confirm your slots before capacity fills, please open the event portal and enter your 12-digit UTR reference:
 ${ticketLookupUrl}
 
@@ -317,7 +317,20 @@ function Dashboard({ stats, onNavigate }) {
       <article className="stat-card stat-card--accent">
         <span className="stat-card__label">Confirmed revenue</span>
         <strong className="stat-card__value">₹{stats.revenue?.toLocaleString('en-IN') || 0}</strong>
-        <span className="stat-card__sub">{stats.confirmed || 0} teams confirmed @ ₹300</span>
+        <span className="stat-card__sub">{stats.confirmed || 0} teams confirmed (calculated sum)</span>
+        {Boolean(stats.discountsGiven) && (
+          <span className="stat-card__sub" style={{ color: '#c6f24e', marginTop: '2px' }}>
+            ₹{stats.discountsGiven?.toLocaleString('en-IN')} discounts given ({stats.couponTeamsCount || 0} teams)
+          </span>
+        )}
+      </article>
+
+      <article className="stat-card" onClick={() => onNavigate('coupons')} style={{ cursor: 'pointer' }}>
+        <span className="stat-card__label">Coupons Redeemed</span>
+        <strong className="stat-card__value" style={{ color: '#ff9a4d' }}>{stats.couponTeamsCount || 0}</strong>
+        <span className="stat-card__sub">
+          {stats.discountsGiven ? `₹${stats.discountsGiven?.toLocaleString('en-IN')} saved by teams →` : 'Manage coupons →'}
+        </span>
       </article>
 
       <article className="stat-card" onClick={() => onNavigate('payments', 'PENDING_REVIEW')} style={{ cursor: 'pointer' }}>
@@ -374,23 +387,43 @@ function PaymentQueue({ registrations, onActionComplete, onOpenEmail }) {
   const [notice, setNotice] = useState('');
   const [rejectingItem, setRejectingItem] = useState(null);
   const [rejectReason, setRejectReason] = useState('UTR not found in club bank account statement.');
+  const [approvingItem, setApprovingItem] = useState(null);
+  const [amountReceivedInput, setAmountReceivedInput] = useState('');
+  const [approveNote, setApproveNote] = useState('');
+  const [couponCodeSearch, setCouponCodeSearch] = useState('');
   const [lightboxUrl, setLightboxUrl] = useState('');
-  const [filterMode, setFilterMode] = useState('review'); // 'review' | 'all' | 'unpaid' | 'not_sent'
+  const [filterMode, setFilterMode] = useState('review'); // 'review' | 'all' | 'unpaid' | 'not_sent' | 'coupon'
 
-  const approve = async (registration) => {
-    setBusyId(registration.id);
+  const startApprove = (registration) => {
+    setApprovingItem(registration);
+    setAmountReceivedInput(String(registration.amount));
+    setApproveNote('');
+    setError('');
+    setNotice('');
+  };
+
+  const handleConfirmApproveSubmit = async (e) => {
+    e.preventDefault();
+    if (!approvingItem) return;
+    setBusyId(approvingItem.id);
     setError('');
     setNotice('');
     try {
+      const parsedAmountReceived = Number(amountReceivedInput);
       const result = await api('approve-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ registrationId: registration.id }),
+        body: JSON.stringify({
+          registrationId: approvingItem.id,
+          amountReceived: parsedAmountReceived,
+          note: approveNote,
+        }),
       });
       setNotice(result.message || 'Payment confirmed and ticket generated.');
+      const itemToEmail = result.registration || approvingItem;
+      setApprovingItem(null);
       onActionComplete();
-      // Prompt admin to send confirmation email
-      onOpenEmail(result.registration || registration, 'confirmed');
+      onOpenEmail(itemToEmail, 'confirmed');
     } catch (nextError) {
       setError(nextError.message);
     } finally {
@@ -427,9 +460,16 @@ function PaymentQueue({ registrations, onActionComplete, onOpenEmail }) {
   };
 
   const filtered = registrations.filter((r) => {
-    if (filterMode === 'review') return r.paymentStatus === 'PENDING_REVIEW';
-    if (filterMode === 'unpaid') return r.paymentStatus === 'PENDING_PAYMENT';
-    if (filterMode === 'not_sent') return r.paymentStatus === 'PAID' && r.emailStatus !== 'sent';
+    if (filterMode === 'review' && r.paymentStatus !== 'PENDING_REVIEW') return false;
+    if (filterMode === 'unpaid' && r.paymentStatus !== 'PENDING_PAYMENT') return false;
+    if (filterMode === 'not_sent' && !(r.paymentStatus === 'PAID' && r.emailStatus !== 'sent')) return false;
+    if (filterMode === 'coupon' && !r.couponCode) return false;
+    if (couponCodeSearch) {
+      const q = couponCodeSearch.toLowerCase();
+      const matchCoupon = r.couponCode && r.couponCode.toLowerCase().includes(q);
+      const matchTeam = (r.teamName && r.teamName.toLowerCase().includes(q)) || (r.teamId && r.teamId.toLowerCase().includes(q));
+      if (!matchCoupon && !matchTeam) return false;
+    }
     return true;
   });
 
@@ -466,11 +506,33 @@ function PaymentQueue({ registrations, onActionComplete, onOpenEmail }) {
         </button>
         <button
           type="button"
+          className={`chip-btn ${filterMode === 'coupon' ? 'is-active' : ''}`}
+          onClick={() => setFilterMode('coupon')}
+        >
+          Coupons Applied
+        </button>
+        <button
+          type="button"
           className={`chip-btn ${filterMode === 'all' ? 'is-active' : ''}`}
           onClick={() => setFilterMode('all')}
         >
           All Payments ({registrations.length})
         </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', margin: '10px 0 16px' }}>
+        <input
+          type="text"
+          value={couponCodeSearch}
+          onChange={(e) => setCouponCodeSearch(e.target.value)}
+          placeholder="Filter queue by coupon code or team…"
+          style={{ maxWidth: '320px', minHeight: '34px', fontSize: '13px' }}
+        />
+        {couponCodeSearch && (
+          <button type="button" className="quiet" onClick={() => setCouponCodeSearch('')} style={{ minHeight: '34px', fontSize: '12px' }}>
+            Clear filter
+          </button>
+        )}
       </div>
 
       {error && <p className="form-error" role="alert">{error}</p>}
@@ -498,14 +560,35 @@ function PaymentQueue({ registrations, onActionComplete, onOpenEmail }) {
                 {r.duplicateUtr && (
                   <span className="warn-badge">⚠️ Duplicate UTR submitted on multiple teams!</span>
                 )}
-                {r.amount !== 300 && (
-                  <span className="warn-badge">⚠️ Amount mismatch: ₹{r.amount} (expected ₹300)</span>
+                {r.amountReceived !== null && r.amountReceived !== undefined && r.amountReceived !== r.amount && (
+                  <span className="warn-badge" style={{ background: 'rgba(255, 70, 70, 0.15)', color: '#ff8888', borderColor: 'rgba(255, 70, 70, 0.3)' }}>
+                    ⚠️ Received ₹{r.amountReceived} (Expected ₹{r.amount})
+                  </span>
+                )}
+                {!r.couponCode && r.amount !== 300 && (
+                  <span className="warn-badge">⚠️ Non-standard amount: ₹{r.amount} (base ₹300)</span>
                 )}
               </div>
 
               <div className="queue-row__utr">
-                <span className="row-label">12-digit UTR</span>
+                <span className="row-label">Payment & UTR</span>
                 <code>{r.utr || <span className="muted-text">None submitted</span>}</code>
+                <div style={{ marginTop: '6px', fontSize: '13px' }}>
+                  {r.couponCode ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span style={{ textDecoration: 'line-through', color: '#777', fontSize: '12px' }}>₹{r.listPrice || 300}</span>
+                      <span className="coupon-badge">🏷️ {r.couponCode} (-₹{r.discountAmount})</span>
+                      <strong style={{ color: '#ff9a4d' }}>₹{r.amount}</strong>
+                    </div>
+                  ) : (
+                    <strong>₹{r.amount}</strong>
+                  )}
+                  {r.amountReceived !== null && r.amountReceived !== undefined && (
+                    <span style={{ fontSize: '11px', color: '#c6f24e', display: 'block', marginTop: '2px' }}>
+                      Received: ₹{r.amountReceived}
+                    </span>
+                  )}
+                </div>
                 <span className="amount-label">Status: {statusLabels[r.paymentStatus]}</span>
               </div>
 
@@ -539,7 +622,7 @@ function PaymentQueue({ registrations, onActionComplete, onOpenEmail }) {
                 {r.paymentStatus !== 'PAID' && (
                   <button
                     className="btn-approve"
-                    onClick={() => approve(r)}
+                    onClick={() => startApprove(r)}
                     disabled={busyId === r.id}
                   >
                     {busyId === r.id ? 'Approving…' : 'Confirm & Issue'}
@@ -564,6 +647,84 @@ function PaymentQueue({ registrations, onActionComplete, onOpenEmail }) {
               </div>
             </article>
           ))}
+        </div>
+      )}
+
+      {/* Confirm Payment Approval Modal */}
+      {approvingItem && (
+        <div className="modal-backdrop" onClick={() => setApprovingItem(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Confirm Payment for {approvingItem.teamName}</h3>
+            <p style={{ fontSize: '13px', color: '#b4b4b4', marginBottom: '16px' }}>
+              Verify that the transfer is visible in the club account statement before approving.
+            </p>
+
+            <div className="pricing-summary-card">
+              <div className="summary-line">
+                <span>Team ID:</span>
+                <code>{approvingItem.teamId || approvingItem.orderRef}</code>
+              </div>
+              <div className="summary-line">
+                <span>UTR Reference:</span>
+                <code>{approvingItem.utr || 'None submitted'}</code>
+              </div>
+              <div className="summary-line">
+                <span>List Price:</span>
+                <span>₹{approvingItem.listPrice ?? 300}</span>
+              </div>
+              {approvingItem.couponCode && (
+                <div className="summary-line" style={{ color: '#ff9a4d' }}>
+                  <span>Coupon Applied:</span>
+                  <span><code>{approvingItem.couponCode}</code> (-₹{approvingItem.discountAmount})</span>
+                </div>
+              )}
+              <div className="summary-line summary-line--total">
+                <strong>Expected Amount:</strong>
+                <strong style={{ color: '#c6f24e', fontSize: '16px' }}>₹{approvingItem.amount}</strong>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfirmApproveSubmit} style={{ marginTop: '16px' }}>
+              <label htmlFor="amount-received">
+                Amount received in bank account (INR) *
+                <input
+                  id="amount-received"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={amountReceivedInput}
+                  onChange={(e) => setAmountReceivedInput(e.target.value)}
+                  required
+                />
+              </label>
+
+              {Number(amountReceivedInput) !== approvingItem.amount && (
+                <div className="diff-alert" role="alert">
+                  ⚠️ <strong>Amount Discrepancy:</strong> Amount received (₹{amountReceivedInput}) does not match expected amount (₹{approvingItem.amount}). This difference will be recorded on the team's record and in the audit log.
+                </div>
+              )}
+
+              <label htmlFor="approve-note">
+                Organiser note (optional)
+                <textarea
+                  id="approve-note"
+                  rows={2}
+                  value={approveNote}
+                  onChange={(e) => setApproveNote(e.target.value)}
+                  placeholder="e.g. Verified in ICICI bank statement at 14:32"
+                />
+              </label>
+
+              <div className="modal-actions">
+                <button type="button" className="quiet" onClick={() => setApprovingItem(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-approve" disabled={Boolean(busyId)}>
+                  {busyId ? 'Confirming…' : 'Confirm & Issue Ticket'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -1018,6 +1179,51 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
   const [notice, setNotice] = useState('');
   const [copiedBulk, setCopiedBulk] = useState('');
 
+  const [changingAmountItem, setChangingAmountItem] = useState(null);
+  const [changeAmountForm, setChangeAmountForm] = useState({ listPrice: 300, couponCode: '', discountAmount: 0, amount: 300, reason: '' });
+  const [changeAmountBusy, setChangeAmountBusy] = useState(false);
+  const [changeAmountError, setChangeAmountError] = useState('');
+
+  const openChangeAmount = (reg) => {
+    setChangingAmountItem(reg);
+    setChangeAmountForm({
+      listPrice: reg.listPrice ?? 300,
+      couponCode: reg.couponCode || '',
+      discountAmount: reg.discountAmount ?? 0,
+      amount: reg.amount,
+      reason: '',
+    });
+    setChangeAmountError('');
+  };
+
+  const handleChangeAmountSubmit = async (e) => {
+    e.preventDefault();
+    if (!changingAmountItem) return;
+    setChangeAmountBusy(true);
+    setChangeAmountError('');
+    try {
+      await api('change-amount', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          registrationId: changingAmountItem.id,
+          listPrice: Number(changeAmountForm.listPrice),
+          couponCode: changeAmountForm.couponCode ? changeAmountForm.couponCode.trim() : null,
+          discountAmount: Number(changeAmountForm.discountAmount),
+          amount: Number(changeAmountForm.amount),
+          reason: changeAmountForm.reason,
+        }),
+      });
+      setNotice(`Pricing and coupon updated for ${changingAmountItem.teamName}.`);
+      setChangingAmountItem(null);
+      onActionComplete();
+    } catch (err) {
+      setChangeAmountError(err.message);
+    } finally {
+      setChangeAmountBusy(false);
+    }
+  };
+
   const openEdit = (member) => {
     setEditingMember(member);
     setMemberForm({
@@ -1118,6 +1324,7 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
                 <th>Payment Ref</th>
                 <th>Team</th>
                 <th>Status</th>
+                <th>Pricing & Coupon</th>
                 <th>UTR Reference</th>
                 <th>Ticket ID</th>
                 <th>Members & Colleges</th>
@@ -1138,6 +1345,25 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
                       {statusLabels[r.paymentStatus]}
                     </span>
                     {r.rejectReason && <small className="reject-inline">{r.rejectReason}</small>}
+                  </td>
+                  <td>
+                    <div>
+                      <strong>₹{r.amount}</strong>
+                      {r.couponCode ? (
+                        <div style={{ marginTop: '3px' }}>
+                          <span className="coupon-badge">
+                            🏷️ {r.couponCode} (-₹{r.discountAmount})
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="muted-text" style={{ fontSize: '11px', display: 'block' }}>Base ₹{r.listPrice || 300}</span>
+                      )}
+                      {r.amountReceived !== null && r.amountReceived !== undefined && (
+                        <span style={{ fontSize: '11px', color: '#c6f24e', display: 'block', marginTop: '2px' }}>
+                          Recv: ₹{r.amountReceived}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td>
                     <code>{r.utr || r.paymentReference || '—'}</code>
@@ -1162,13 +1388,22 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
                     ))}
                   </td>
                   <td>
-                    <button
-                      type="button"
-                      className="table-action"
-                      onClick={() => onOpenEmail(r, r.paymentStatus === 'PAID' ? 'confirmed' : 'reminder')}
-                    >
-                      ✉ Email
-                    </button>
+                    <div style={{ display: 'grid', gap: '6px' }}>
+                      <button
+                        type="button"
+                        className="table-action"
+                        onClick={() => openChangeAmount(r)}
+                      >
+                        ⚙ Adjust price
+                      </button>
+                      <button
+                        type="button"
+                        className="table-action"
+                        onClick={() => onOpenEmail(r, r.paymentStatus === 'PAID' ? 'confirmed' : 'reminder')}
+                      >
+                        ✉ Email
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1227,6 +1462,101 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
                 </button>
                 <button type="submit" disabled={editBusy}>
                   {editBusy ? 'Saving…' : 'Save Details'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Change Amount or Coupon Modal */}
+      {changingAmountItem && (
+        <div className="modal-backdrop" onClick={() => setChangingAmountItem(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Adjust Pricing & Coupon for {changingAmountItem.teamName}</h3>
+            <p style={{ fontSize: '13px', color: '#b4b4b4', marginBottom: '14px' }}>
+              Team ID: <code>{changingAmountItem.teamId || changingAmountItem.orderRef}</code> · Current Status: <code>{statusLabels[changingAmountItem.paymentStatus]}</code>
+            </p>
+
+            {changeAmountError && <p className="form-error" role="alert">{changeAmountError}</p>}
+
+            <form onSubmit={handleChangeAmountSubmit}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <label>
+                  List Price (INR)
+                  <input
+                    type="number"
+                    min="0"
+                    value={changeAmountForm.listPrice}
+                    onChange={(e) => {
+                      const lp = Number(e.target.value);
+                      setChangeAmountForm((prev) => ({
+                        ...prev,
+                        listPrice: lp,
+                        amount: Math.max(0, lp - Number(prev.discountAmount || 0)),
+                      }));
+                    }}
+                    required
+                  />
+                </label>
+                <label>
+                  Coupon Code (optional)
+                  <input
+                    type="text"
+                    value={changeAmountForm.couponCode}
+                    placeholder="e.g. halloween_night"
+                    onChange={(e) => setChangeAmountForm((prev) => ({ ...prev, couponCode: e.target.value }))}
+                  />
+                </label>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <label>
+                  Discount Amount (INR)
+                  <input
+                    type="number"
+                    min="0"
+                    value={changeAmountForm.discountAmount}
+                    onChange={(e) => {
+                      const disc = Number(e.target.value);
+                      setChangeAmountForm((prev) => ({
+                        ...prev,
+                        discountAmount: disc,
+                        amount: Math.max(0, Number(prev.listPrice || 300) - disc),
+                      }));
+                    }}
+                    required
+                  />
+                </label>
+                <label>
+                  Final Amount to Pay (INR) *
+                  <input
+                    type="number"
+                    min="1"
+                    value={changeAmountForm.amount}
+                    onChange={(e) => setChangeAmountForm((prev) => ({ ...prev, amount: Number(e.target.value) }))}
+                    required
+                  />
+                </label>
+              </div>
+
+              <label>
+                Reason for modification (required for audit trail) *
+                <textarea
+                  rows={3}
+                  value={changeAmountForm.reason}
+                  onChange={(e) => setChangeAmountForm((prev) => ({ ...prev, reason: e.target.value }))}
+                  placeholder="e.g. Approved sponsor partner concession, confirmed with organizing lead."
+                  required
+                />
+              </label>
+
+              <div className="modal-actions">
+                <button type="button" className="quiet" onClick={() => setChangingAmountItem(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-approve" disabled={changeAmountBusy}>
+                  {changeAmountBusy ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -1405,6 +1735,291 @@ function SettingsView({ onActionComplete }) {
 }
 
 // -------------------------------------------------------------
+// Coupons Management View
+// -------------------------------------------------------------
+function CouponsView({ onActionComplete }) {
+  const [coupons, setCoupons] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newCoupon, setNewCoupon] = useState({
+    code: '',
+    type: 'flat',
+    value: 180,
+    maxUses: '',
+    expiresAt: '',
+    active: true,
+  });
+
+  const loadCoupons = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api('coupons');
+      setCoupons(res.coupons || []);
+      setError('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCoupons();
+  }, [loadCoupons]);
+
+  const toggleActive = async (coupon) => {
+    setBusyId(coupon.id);
+    setError('');
+    setNotice('');
+    try {
+      const res = await api('coupons', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: coupon.id,
+          active: !coupon.active,
+        }),
+      });
+      setNotice(res.message);
+      await loadCoupons();
+      onActionComplete();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const deleteCoupon = async (coupon) => {
+    if (!window.confirm(`Are you sure you want to delete coupon "${coupon.code}"?`)) return;
+    setBusyId(coupon.id);
+    setError('');
+    setNotice('');
+    try {
+      const res = await api(`coupons?id=${encodeURIComponent(coupon.id)}`, {
+        method: 'DELETE',
+      });
+      setNotice(res.message);
+      await loadCoupons();
+      onActionComplete();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  const handleCreateSubmit = async (e) => {
+    e.preventDefault();
+    setBusyId('create');
+    setError('');
+    setNotice('');
+    try {
+      const res = await api('coupons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: newCoupon.code,
+          type: newCoupon.type,
+          value: Number(newCoupon.value),
+          maxUses: newCoupon.maxUses ? parseInt(newCoupon.maxUses, 10) : null,
+          expiresAt: newCoupon.expiresAt ? new Date(newCoupon.expiresAt).toISOString() : null,
+          active: newCoupon.active,
+        }),
+      });
+      setNotice(res.message);
+      setShowCreateModal(false);
+      setNewCoupon({ code: '', type: 'flat', value: 180, maxUses: '', expiresAt: '', active: true });
+      await loadCoupons();
+      onActionComplete();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId('');
+    }
+  };
+
+  return (
+    <section className="coupons-section">
+      <div className="section-head">
+        <div>
+          <h2>Event Coupon Management</h2>
+          <p>Create, configure, monitor usage, or deactivate discount codes for Hack-O-Lantern.</p>
+        </div>
+        <button
+          type="button"
+          className="btn-approve"
+          onClick={() => setShowCreateModal(true)}
+        >
+          + Create Coupon
+        </button>
+      </div>
+
+      {error && <p className="form-error" role="alert" style={{ marginTop: '16px' }}>{error}</p>}
+      {notice && <p className="form-notice" role="status" style={{ marginTop: '16px' }}>{notice}</p>}
+
+      {loading ? (
+        <p className="empty">Loading coupons…</p>
+      ) : coupons.length === 0 ? (
+        <p className="empty">No coupons configured.</p>
+      ) : (
+        <div className="coupons-grid">
+          {coupons.map((c) => (
+            <article className={`coupon-card ${c.active ? 'coupon-card--active' : 'coupon-card--inactive'}`} key={c.id}>
+              <div className="coupon-card__header">
+                <div>
+                  <span className="coupon-code-badge">{c.code}</span>
+                  <strong className="coupon-value-title">
+                    {c.type === 'percent' ? `${c.value}% OFF` : `₹${c.value} FLAT OFF`}
+                  </strong>
+                </div>
+                <span className={`coupon-status-pill ${c.active ? 'coupon-status-pill--active' : 'coupon-status-pill--inactive'}`}>
+                  {c.active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+
+              <div className="coupon-card__stats">
+                <div className="coupon-stat-item">
+                  <span className="stat-label">Used count:</span>
+                  <strong>{c.usedCount} {c.maxUses ? `/ ${c.maxUses}` : '(Unlimited)'}</strong>
+                </div>
+                <div className="coupon-stat-item">
+                  <span className="stat-label">Referenced by:</span>
+                  <span>{c.registrationsCount} team(s)</span>
+                </div>
+                <div className="coupon-stat-item">
+                  <span className="stat-label">Expires:</span>
+                  <span>{c.expiresAt ? formatDate(c.expiresAt) : 'No expiration'}</span>
+                </div>
+              </div>
+
+              <div className="coupon-card__actions">
+                <button
+                  type="button"
+                  className="table-action"
+                  onClick={() => toggleActive(c)}
+                  disabled={busyId === c.id}
+                >
+                  {c.active ? 'Deactivate' : 'Activate'}
+                </button>
+                {c.usedCount === 0 && c.registrationsCount === 0 ? (
+                  <button
+                    type="button"
+                    className="table-action table-action--danger"
+                    onClick={() => deleteCoupon(c)}
+                    disabled={busyId === c.id}
+                  >
+                    Delete
+                  </button>
+                ) : (
+                  <span className="muted-text" style={{ fontSize: '11px', alignSelf: 'center' }}>
+                    Used (Cannot delete)
+                  </span>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {/* Create Coupon Modal */}
+      {showCreateModal && (
+        <div className="modal-backdrop" onClick={() => setShowCreateModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Create New Coupon</h3>
+            <p style={{ fontSize: '13px', color: '#b4b4b4', marginBottom: '14px' }}>
+              Add a discount code that participants can apply on the payment screen.
+            </p>
+
+            <form onSubmit={handleCreateSubmit}>
+              <label>
+                Coupon Code * (4-32 characters: letters, numbers, _, -)
+                <input
+                  type="text"
+                  value={newCoupon.code}
+                  onChange={(e) => setNewCoupon({ ...newCoupon, code: e.target.value })}
+                  placeholder="e.g. halloween_night"
+                  pattern="^[a-zA-Z0-9_-]{4,32}$"
+                  title="4-32 characters, only alphanumeric, hyphens, and underscores"
+                  required
+                />
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <label>
+                  Discount Type
+                  <select
+                    value={newCoupon.type}
+                    onChange={(e) => setNewCoupon({ ...newCoupon, type: e.target.value })}
+                  >
+                    <option value="flat">Flat amount (₹)</option>
+                    <option value="percent">Percentage (%)</option>
+                  </select>
+                </label>
+                <label>
+                  Discount Value *
+                  <input
+                    type="number"
+                    min="1"
+                    max={newCoupon.type === 'percent' ? '100' : undefined}
+                    value={newCoupon.value}
+                    onChange={(e) => setNewCoupon({ ...newCoupon, value: e.target.value })}
+                    required
+                  />
+                </label>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <label>
+                  Max Uses (optional)
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Leave empty for unlimited"
+                    value={newCoupon.maxUses}
+                    onChange={(e) => setNewCoupon({ ...newCoupon, maxUses: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Expiration Date (optional)
+                  <input
+                    type="datetime-local"
+                    value={newCoupon.expiresAt}
+                    onChange={(e) => setNewCoupon({ ...newCoupon, expiresAt: e.target.value })}
+                  />
+                </label>
+              </div>
+
+              <label className="toggle-row" style={{ cursor: 'pointer', margin: '8px 0' }}>
+                <span>Activate immediately upon creation</span>
+                <input
+                  type="checkbox"
+                  style={{ width: 'auto', minHeight: 'auto' }}
+                  checked={newCoupon.active}
+                  onChange={(e) => setNewCoupon({ ...newCoupon, active: e.target.checked })}
+                />
+              </label>
+
+              <div className="modal-actions">
+                <button type="button" className="quiet" onClick={() => setShowCreateModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-approve" disabled={busyId === 'create'}>
+                  {busyId === 'create' ? 'Creating…' : 'Create Coupon'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// -------------------------------------------------------------
 // Main App Component with Tabs
 // -------------------------------------------------------------
 export default function App() {
@@ -1456,7 +2071,7 @@ export default function App() {
   useEffect(() => {
     const handleHash = () => {
       const h = window.location.hash.replace('#', '');
-      if (['dashboard', 'payments', 'tickets', 'checkin', 'teams', 'settings'].includes(h)) {
+      if (['dashboard', 'payments', 'tickets', 'checkin', 'teams', 'coupons', 'settings'].includes(h)) {
         setTab(h);
       }
     };
@@ -1526,6 +2141,13 @@ export default function App() {
             All teams <span>{registrations.length}</span>
           </a>
           <a
+            href="#coupons"
+            className={tab === 'coupons' ? 'is-active' : ''}
+            onClick={() => changeTab('coupons')}
+          >
+            Coupons <span>{stats.couponTeamsCount || 0}</span>
+          </a>
+          <a
             href="#settings"
             className={tab === 'settings' ? 'is-active' : ''}
             onClick={() => changeTab('settings')}
@@ -1587,6 +2209,7 @@ export default function App() {
             onOpenEmail={openEmailModal}
           />
         )}
+        {tab === 'coupons' && <CouponsView onActionComplete={load} />}
         {tab === 'settings' && <SettingsView onActionComplete={load} />}
       </main>
 

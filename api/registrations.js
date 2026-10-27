@@ -15,10 +15,16 @@ export default async function handler(request, response) {
   const search = String(request.query.search || '').trim().slice(0, 80);
   const status = validStatuses.has(request.query.status) ? request.query.status : undefined;
   const emailFilter = String(request.query.emailFilter || '').trim();
+  const couponFilter = String(request.query.couponFilter || '').trim();
 
   const where = {
     ...(status ? { paymentStatus: status } : {}),
     ...(emailFilter === 'not_sent' ? { paymentStatus: 'PAID', emailStatus: { not: 'sent' } } : {}),
+    ...(couponFilter === 'has_coupon'
+      ? { couponCode: { not: null } }
+      : couponFilter
+        ? { couponCode: { equals: couponFilter, mode: 'insensitive' } }
+        : {}),
     ...(search
       ? {
           OR: [
@@ -29,6 +35,7 @@ export default async function handler(request, response) {
             { ticketId: { contains: search, mode: 'insensitive' } },
             { utr: { contains: search, mode: 'insensitive' } },
             { paymentReference: { contains: search, mode: 'insensitive' } },
+            { couponCode: { contains: search, mode: 'insensitive' } },
             {
               members: {
                 some: {
@@ -46,7 +53,7 @@ export default async function handler(request, response) {
   };
 
   try {
-    const [registrations, grouped, totalCheckedIn, confirmedEmailNotSent] = await prisma.$transaction([
+    const [registrations, grouped, totalCheckedIn, confirmedEmailNotSent, paidRows] = await prisma.$transaction([
       prisma.registration.findMany({
         where,
         take: 300,
@@ -56,12 +63,18 @@ export default async function handler(request, response) {
       prisma.registration.groupBy({ by: ['paymentStatus'], _count: { _all: true } }),
       prisma.registration.count({ where: { checkedInAt: { not: null } } }),
       prisma.registration.count({ where: { paymentStatus: 'PAID', emailStatus: { not: 'sent' } } }),
+      prisma.registration.findMany({
+        where: { paymentStatus: 'PAID' },
+        select: { amount: true, discountAmount: true, couponCode: true },
+      }),
     ]);
 
     const totals = Object.fromEntries(grouped.map((row) => [row.paymentStatus, row._count._all]));
     const totalCount = Object.values(totals).reduce((a, b) => a + b, 0);
     const paidCount = totals.PAID || 0;
-    const confirmedRevenue = paidCount * 300;
+    const confirmedRevenue = paidRows.reduce((sum, r) => sum + (r.amount || 0), 0);
+    const discountsGiven = paidRows.reduce((sum, r) => sum + (r.discountAmount || 0), 0);
+    const couponTeamsCount = paidRows.filter((r) => Boolean(r.couponCode)).length;
 
     // Detect duplicate UTRs across loaded registrations
     const utrCounts = {};
@@ -84,7 +97,11 @@ export default async function handler(request, response) {
           teamId: r.teamId || r.orderRef,
           paymentRef: r.paymentRef,
           orderRef: r.orderRef,
+          listPrice: r.listPrice,
+          couponCode: r.couponCode,
+          discountAmount: r.discountAmount,
           amount: r.amount,
+          amountReceived: r.amountReceived,
           teamName: r.teamName,
           paymentStatus: r.paymentStatus,
           paymentReference: r.paymentReference,
@@ -132,6 +149,8 @@ export default async function handler(request, response) {
         checkedIn: totalCheckedIn,
         confirmedEmailNotSent,
         revenue: confirmedRevenue,
+        discountsGiven,
+        couponTeamsCount,
       },
     });
   } catch (error) {

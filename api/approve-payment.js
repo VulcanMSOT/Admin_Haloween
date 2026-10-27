@@ -38,6 +38,36 @@ export default async function handler(request, response) {
       });
     }
 
+    // If a coupon code is applied, validate that it is active and within usage limits
+    if (existing.couponCode) {
+      const coupon = await prisma.coupon.findUnique({
+        where: { code: existing.couponCode },
+      });
+
+      if (coupon) {
+        if (!coupon.active) {
+          return json(response, 400, { error: `Coupon ${existing.couponCode} is no longer active.` });
+        }
+        if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
+          return json(response, 400, { error: `Coupon ${existing.couponCode} has reached its maximum uses.` });
+        }
+        if (coupon.expiresAt && new Date() > new Date(coupon.expiresAt)) {
+          return json(response, 400, { error: `Coupon ${existing.couponCode} has expired.` });
+        }
+
+        // Increment usage count
+        await prisma.coupon.update({
+          where: { id: coupon.id },
+          data: { usedCount: { increment: 1 } },
+        });
+      }
+    }
+
+    const { amountReceived } = parseBody(request);
+    const parsedAmountReceived = (amountReceived !== undefined && amountReceived !== null && String(amountReceived).trim() !== '' && !isNaN(Number(amountReceived)))
+      ? Number(amountReceived)
+      : existing.amount;
+
     const nextTicketId = existing.ticketId || ticketId();
     const nextTicketToken = existing.ticketToken || randomBytes(24).toString('base64url');
 
@@ -45,6 +75,7 @@ export default async function handler(request, response) {
       where: { id: existing.id },
       data: {
         paymentStatus: 'PAID',
+        amountReceived: parsedAmountReceived,
         paymentApprovedAt: new Date(),
         paymentApprovedBy: session.email || 'organiser',
         paymentNote: note ? String(note).slice(0, 500) : null,
@@ -63,7 +94,11 @@ export default async function handler(request, response) {
         paymentRef: updated.paymentRef,
         utr: updated.utr,
         ticketId: updated.ticketId,
+        listPrice: updated.listPrice,
+        couponCode: updated.couponCode,
+        discountAmount: updated.discountAmount,
         amount: updated.amount,
+        amountReceived: updated.amountReceived,
       },
     });
 
