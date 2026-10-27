@@ -83,7 +83,7 @@ model Coupon {
 model EventSettings {
   id                String    @id @default("default")
   eventName         String    @default("Hack-O-Lantern") @map("event_name")
-  eventDate         String    @default("31 Oct 2026, 7:00 PM – 1 Nov 2026, 7:00 AM") @map("event_date")
+  eventDate         String    @default("31 Oct 2026, 7:00 PM – 1 Nov 2026, 11:00 AM") @map("event_date")
   eventVenue        String    @default("Mirai Floor, Bengaluru") @map("event_venue")
   registrationsOpen Boolean   @default(true) @map("registrations_open")
   opensAt           DateTime? @map("opens_at")

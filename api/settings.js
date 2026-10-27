@@ -17,7 +17,7 @@ export default async function handler(request, response) {
           data: {
             id: 'default',
             eventName: 'Hack-O-Lantern',
-            eventDate: '31 Oct 2026, 7:00 PM – 1 Nov 2026, 7:00 AM',
+            eventDate: '31 Oct 2026, 7:00 PM – 1 Nov 2026, 11:00 AM',
             eventVenue: 'Mirai Floor, Bengaluru',
             registrationsOpen: true,
             maxCapacity: 100,

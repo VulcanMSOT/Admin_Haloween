@@ -75,7 +75,7 @@ Team ID: ${teamId}
 Payment Reference: ${paymentRef}
 Official Ticket ID: ${ticketId}
 
-Event Schedule: Night of 31 October 2026, 7:00 PM – 1 November 2026, 7:00 AM (12 Hours)
+Event Schedule: Night of 31 October 2026, 7:00 PM – 1 November 2026, 11:00 AM (16 Hours)
 Venue: Mirai Floor, Bengaluru
 
 View and download your official entry pass & ticket QR code here:
@@ -1705,7 +1705,7 @@ function SettingsView({ onActionComplete }) {
               <input
                 id="event-date-input"
                 type="text"
-                value={settings?.eventDate || '31 Oct 2026, 7:00 PM – 1 Nov 2026, 7:00 AM'}
+                value={settings?.eventDate || '31 Oct 2026, 7:00 PM – 1 Nov 2026, 11:00 AM'}
                 onChange={(e) => setSettings({ ...settings, eventDate: e.target.value })}
                 required
               />
