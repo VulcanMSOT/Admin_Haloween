@@ -139,6 +139,18 @@ export async function validateReferralCode(rawCode, options = {}) {
     return { valid: false, error: "That referral code isn't valid." };
   }
 
+  // Mirai School of Technology students cannot use referral codes
+  const eligibleCollege = (settings?.eligibleCollegeName || 'Mirai School of Technology').trim().toLowerCase();
+  if (options.teamMembers && Array.isArray(options.teamMembers)) {
+    const hasMirai = options.teamMembers.some((m) => {
+      const col = String(m?.college || '').trim().toLowerCase();
+      return col === eligibleCollege;
+    });
+    if (hasMirai) {
+      return { valid: false, error: 'Referral codes cannot be applied by Mirai School of Technology students.' };
+    }
+  }
+
   const referrer = await prisma.referrer.findFirst({
     where: {
       code,
