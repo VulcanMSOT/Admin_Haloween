@@ -51,6 +51,8 @@ model Registration {
   ticketEmailError   String?       @db.VarChar(500)
   ticketEmailId      String?       @db.VarChar(100)
   checkedInAt        DateTime?
+  referralCode       String?       @map("referral_code") @db.VarChar(32)
+  referral           Referral?
   members            TeamMember[]
 
   @@index([createdAt])
@@ -63,6 +65,7 @@ model Registration {
   @@index([paymentRef])
   @@index([emailStatus])
   @@index([couponCode])
+  @@index([referralCode])
 }
 
 model Coupon {
@@ -81,18 +84,22 @@ model Coupon {
 }
 
 model EventSettings {
-  id                String    @id @default("default")
-  eventName         String    @default("Hack-O-Lantern") @map("event_name")
-  eventDate         String    @default("31 Oct 2026, 7:00 PM – 1 Nov 2026, 11:00 AM") @map("event_date")
-  eventVenue        String    @default("Mirai Floor, Bengaluru") @map("event_venue")
-  registrationsOpen Boolean   @default(true) @map("registrations_open")
-  opensAt           DateTime? @map("opens_at")
-  closesAt          DateTime? @map("closes_at")
-  maxCapacity       Int       @default(100) @map("max_capacity")
-  ticketPrice       Int       @default(300) @map("ticket_price")
-  upiId             String    @default("himangshuyadav2@oksbi") @map("upi_id")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
+  id                    String    @id @default("default")
+  eventName             String    @default("Hack-O-Lantern") @map("event_name")
+  eventDate             String    @default("31 Oct 2026, 7:00 PM – 1 Nov 2026, 11:00 AM") @map("event_date")
+  eventVenue            String    @default("Mirai Floor, Bengaluru") @map("event_venue")
+  registrationsOpen     Boolean   @default(true) @map("registrations_open")
+  opensAt               DateTime? @map("opens_at")
+  closesAt              DateTime? @map("closes_at")
+  maxCapacity           Int       @default(100) @map("max_capacity")
+  ticketPrice           Int       @default(300) @map("ticket_price")
+  upiId                 String    @default("himangshuyadav2@oksbi") @map("upi_id")
+  referralProgramActive Boolean   @default(true) @map("referral_program_active")
+  eligibleCollegeName   String    @default("Mirai School of Technology") @map("eligible_college_name")
+  referralRewardText    String    @default("") @map("referral_reward_text")
+  miraiEmailDomain      String    @default("") @map("mirai_email_domain")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at")
 
   @@map("event_settings")
 }
@@ -132,4 +139,46 @@ model TeamMember {
   @@unique([registrationId, position])
   @@index([college])
   @@index([registrationId])
+}
+
+model Referrer {
+  id           String     @id @default(cuid())
+  name         String     @db.VarChar(100)
+  email        String     @unique @db.VarChar(254)
+  phone        String?    @db.VarChar(16)
+  type         String     @default("club_member") @db.VarChar(32)
+  code         String     @unique @db.VarChar(32)
+  active       Boolean    @default(true)
+  sourceTeamId String?    @map("source_team_id") @db.VarChar(32)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at")
+  referrals    Referral[]
+
+  @@map("referrers")
+  @@index([code])
+  @@index([active])
+}
+
+model Referral {
+  id             String       @id @default(cuid())
+  referrerId     String       @map("referrer_id")
+  referrer       Referrer     @relation(fields: [referrerId], references: [id], onDelete: Cascade)
+  referredTeamId String       @unique @map("referred_team_id")
+  referredTeam   Registration @relation(fields: [referredTeamId], references: [id], onDelete: Cascade)
+  status         String       @default("pending") @db.VarChar(16)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  confirmedAt    DateTime?    @map("confirmed_at")
+  reversedAt     DateTime?    @map("reversed_at")
+
+  @@map("referrals")
+  @@index([referrerId])
+  @@index([status])
+  @@index([referredTeamId])
+}
+
+model RegistrationRateLimit {
+  key           String   @id @db.VarChar(128)
+  windowStarted DateTime
+  attempts      Int      @default(0)
+  updatedAt     DateTime @updatedAt
 }

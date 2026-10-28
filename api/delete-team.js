@@ -3,6 +3,7 @@ import { prisma } from './_lib/prisma.js';
 import { requireSession } from './_lib/session.js';
 import { logAdminAction } from './_lib/audit.js';
 import { getSupabaseAdmin } from './_lib/supabase-admin.js';
+import { reverseTeamReferral } from './_lib/referral.js';
 
 export default async function handler(request, response) {
   if (handleCors(request, response, ['POST', 'DELETE', 'OPTIONS'])) return;
@@ -31,19 +32,31 @@ export default async function handler(request, response) {
       return json(response, 404, { error: 'Team / Registration not found.' });
     }
 
-    // 1. If team had a confirmed payment with a coupon, restore the coupon used count
-    if (existing.couponCode && existing.paymentStatus === 'PAID') {
-      try {
-        await prisma.coupon.updateMany({
-          where: { code: existing.couponCode, usedCount: { gt: 0 } },
-          data: { usedCount: { decrement: 1 } },
-        });
-      } catch (couponErr) {
-        console.warn('Could not decrement coupon used count:', couponErr);
+    await prisma.$transaction(async (tx) => {
+      // 1. If team had a confirmed payment with a coupon, restore the coupon used count
+      if (existing.couponCode && existing.paymentStatus === 'PAID') {
+        try {
+          await tx.coupon.updateMany({
+            where: { code: existing.couponCode, usedCount: { gt: 0 } },
+            data: { usedCount: { decrement: 1 } },
+          });
+        } catch (couponErr) {
+          console.warn('Could not decrement coupon used count:', couponErr);
+        }
       }
-    }
 
-    // 2. If there was an uploaded screenshot in Supabase storage, attempt cleanup
+      // 2. Reverse referral count if this was a confirmed team
+      if (existing.paymentStatus === 'PAID') {
+        await reverseTeamReferral(existing.id, tx);
+      }
+
+      // 3. Delete registration from database (TeamMember rows are deleted via Cascade)
+      await tx.registration.delete({
+        where: { id: existing.id },
+      });
+    }, { maxWait: 10000, timeout: 20000 });
+
+    // 4. If there was an uploaded screenshot in Supabase storage, attempt cleanup
     if (existing.screenshotPath) {
       try {
         const supabase = getSupabaseAdmin();
@@ -54,11 +67,6 @@ export default async function handler(request, response) {
         console.warn('Could not remove screenshot file from storage:', storageErr);
       }
     }
-
-    // 3. Delete registration from database (TeamMember rows are deleted via Cascade)
-    await prisma.registration.delete({
-      where: { id: existing.id },
-    });
 
     // 4. Log admin audit action with full team details snapshot
     await logAdminAction({

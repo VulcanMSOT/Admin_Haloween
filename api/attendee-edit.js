@@ -2,23 +2,33 @@ import { json, methodNotAllowed, parseBody } from './_lib/http.js';
 import { prisma } from './_lib/prisma.js';
 import { requireSession } from './_lib/session.js';
 import { logAdminAction } from './_lib/audit.js';
+import { ensureMiraiReferrersForRegistration } from './_lib/referral.js';
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') return methodNotAllowed(response, ['POST']);
   const session = requireSession(request, response);
   if (!session) return;
 
-  const { memberId, fullName, email, phone, college } = parseBody(request);
+  const { memberId, fullName, email, phone, college, markAsMirai, reason } = parseBody(request);
   if (!memberId) return json(response, 400, { error: 'Member ID is required.' });
 
   try {
     const existing = await prisma.teamMember.findUnique({
       where: { id: String(memberId) },
+      include: { registration: true },
     });
     if (!existing) return json(response, 404, { error: 'Team member not found.' });
 
     const cleanEmail = String(email || existing.email).trim().toLowerCase();
     const cleanPhone = String(phone || existing.phone).trim().replace(/[\s-]/g, '').replace(/^\+91/, '');
+
+    const targetCollege = markAsMirai ? 'Mirai School of Technology' : (college ? String(college).trim().slice(0, 80) : existing.college);
+
+    const isMarkingMirai = targetCollege === 'Mirai School of Technology' && existing.college !== 'Mirai School of Technology';
+
+    if (isMarkingMirai && !String(reason || '').trim()) {
+      return json(response, 400, { error: 'A reason is required when marking a member as Mirai School of Technology.' });
+    }
 
     const updated = await prisma.teamMember.update({
       where: { id: existing.id },
@@ -28,20 +38,40 @@ export default async function handler(request, response) {
         normalizedEmail: cleanEmail,
         phone: cleanPhone,
         normalizedPhone: cleanPhone,
-        college: college ? String(college).trim().slice(0, 80) : existing.college,
+        college: targetCollege,
       },
     });
 
-    await logAdminAction({
-      adminEmail: session.email,
-      action: 'edit_attendee',
-      targetId: existing.registrationId,
-      details: {
-        memberId: existing.id,
-        before: { fullName: existing.fullName, email: existing.email, phone: existing.phone, college: existing.college },
-        after: { fullName: updated.fullName, email: updated.email, phone: updated.phone, college: updated.college },
-      },
-    });
+    if (isMarkingMirai) {
+      await logAdminAction({
+        adminEmail: session.email,
+        action: 'mark_member_mirai',
+        targetId: existing.registrationId,
+        details: {
+          memberId: existing.id,
+          memberName: updated.fullName,
+          memberEmail: updated.email,
+          previousCollege: existing.college,
+          reason: String(reason).trim(),
+        },
+      });
+
+      // If team is already confirmed (PAID), generate/ensure referral code immediately
+      if (existing.registration?.paymentStatus === 'PAID') {
+        await ensureMiraiReferrersForRegistration(existing.registrationId, prisma);
+      }
+    } else {
+      await logAdminAction({
+        adminEmail: session.email,
+        action: 'edit_attendee',
+        targetId: existing.registrationId,
+        details: {
+          memberId: existing.id,
+          before: { fullName: existing.fullName, email: existing.email, phone: existing.phone, college: existing.college },
+          after: { fullName: updated.fullName, email: updated.email, phone: updated.phone, college: updated.college },
+        },
+      });
+    }
 
     return json(response, 200, { ok: true, member: updated, message: 'Attendee details updated.' });
   } catch (error) {

@@ -3,6 +3,7 @@ import { handleCors, json, methodNotAllowed, parseBody } from './_lib/http.js';
 import { prisma } from './_lib/prisma.js';
 import { requireSession } from './_lib/session.js';
 import { logAdminAction } from './_lib/audit.js';
+import { confirmTeamReferral, ensureMiraiReferrersForRegistration } from './_lib/referral.js';
 
 function ticketId() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -38,31 +39,6 @@ export default async function handler(request, response) {
       });
     }
 
-    // If a coupon code is applied, validate that it is active and within usage limits
-    if (existing.couponCode) {
-      const coupon = await prisma.coupon.findUnique({
-        where: { code: existing.couponCode },
-      });
-
-      if (coupon) {
-        if (!coupon.active) {
-          return json(response, 400, { error: `Coupon ${existing.couponCode} is no longer active.` });
-        }
-        if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
-          return json(response, 400, { error: `Coupon ${existing.couponCode} has reached its maximum uses.` });
-        }
-        if (coupon.expiresAt && new Date() > new Date(coupon.expiresAt)) {
-          return json(response, 400, { error: `Coupon ${existing.couponCode} has expired.` });
-        }
-
-        // Increment usage count
-        await prisma.coupon.update({
-          where: { id: coupon.id },
-          data: { usedCount: { increment: 1 } },
-        });
-      }
-    }
-
     const { amountReceived } = parseBody(request);
     const parsedAmountReceived = (amountReceived !== undefined && amountReceived !== null && String(amountReceived).trim() !== '' && !isNaN(Number(amountReceived)))
       ? Number(amountReceived)
@@ -71,19 +47,54 @@ export default async function handler(request, response) {
     const nextTicketId = existing.ticketId || ticketId();
     const nextTicketToken = existing.ticketToken || randomBytes(24).toString('base64url');
 
-    const updated = await prisma.registration.update({
-      where: { id: existing.id },
-      data: {
-        paymentStatus: 'PAID',
-        amountReceived: parsedAmountReceived,
-        paymentApprovedAt: new Date(),
-        paymentApprovedBy: session.email || 'organiser',
-        paymentNote: note ? String(note).slice(0, 500) : null,
-        ticketId: nextTicketId,
-        ticketToken: nextTicketToken,
-      },
-      include: { members: { orderBy: { position: 'asc' } } },
-    });
+    const updated = await prisma.$transaction(async (tx) => {
+      // 1. If a coupon code is applied, validate that it is active and within usage limits
+      if (existing.couponCode) {
+        const coupon = await tx.coupon.findUnique({
+          where: { code: existing.couponCode },
+        });
+
+        if (coupon) {
+          if (!coupon.active) {
+            throw new Error(`Coupon ${existing.couponCode} is no longer active.`);
+          }
+          if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
+            throw new Error(`Coupon ${existing.couponCode} has reached its maximum uses.`);
+          }
+          if (coupon.expiresAt && new Date() > new Date(coupon.expiresAt)) {
+            throw new Error(`Coupon ${existing.couponCode} has expired.`);
+          }
+
+          await tx.coupon.update({
+            where: { id: coupon.id },
+            data: { usedCount: { increment: 1 } },
+          });
+        }
+      }
+
+      // 2. Update registration status
+      const reg = await tx.registration.update({
+        where: { id: existing.id },
+        data: {
+          paymentStatus: 'PAID',
+          amountReceived: parsedAmountReceived,
+          paymentApprovedAt: new Date(),
+          paymentApprovedBy: session.email || 'organiser',
+          paymentNote: note ? String(note).slice(0, 500) : null,
+          ticketId: nextTicketId,
+          ticketToken: nextTicketToken,
+        },
+        include: { members: { orderBy: { position: 'asc' } } },
+      });
+
+      // 3. Confirm referral if this team was referred
+      await confirmTeamReferral(existing.id, tx);
+
+      // 4. Automatically generate referral codes for any Mirai student members
+      await ensureMiraiReferrersForRegistration(existing.id, tx);
+
+      return reg;
+    }, { maxWait: 10000, timeout: 20000 });
 
     await logAdminAction({
       adminEmail: session.email,
@@ -109,6 +120,6 @@ export default async function handler(request, response) {
     });
   } catch (error) {
     console.error('Payment approval error', error);
-    return json(response, 500, { error: 'Could not approve this payment.' });
+    return json(response, 500, { error: error.message || 'Could not approve this payment.' });
   }
 }

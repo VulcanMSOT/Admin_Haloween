@@ -2,6 +2,7 @@ import { json, methodNotAllowed, parseBody } from './_lib/http.js';
 import { prisma } from './_lib/prisma.js';
 import { requireSession } from './_lib/session.js';
 import { logAdminAction } from './_lib/audit.js';
+import { reverseTeamReferral } from './_lib/referral.js';
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') return methodNotAllowed(response, ['POST']);
@@ -19,15 +20,19 @@ export default async function handler(request, response) {
     });
     if (!existing) return json(response, 404, { error: 'Registration not found.' });
 
-    const updated = await prisma.registration.update({
-      where: { id: existing.id },
-      data: {
-        paymentStatus: 'REJECTED',
-        revokedAt: new Date(),
-        revokedReason: cleanReason,
-        rejectReason: `Ticket revoked: ${cleanReason}`,
-      },
-    });
+    const updated = await prisma.$transaction(async (tx) => {
+      await reverseTeamReferral(existing.id, tx);
+
+      return await tx.registration.update({
+        where: { id: existing.id },
+        data: {
+          paymentStatus: 'REJECTED',
+          revokedAt: new Date(),
+          revokedReason: cleanReason,
+          rejectReason: `Ticket revoked: ${cleanReason}`,
+        },
+      });
+    }, { maxWait: 10000, timeout: 20000 });
 
     await logAdminAction({
       adminEmail: session.email,

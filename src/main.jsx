@@ -85,6 +85,8 @@ ${ticketLookupUrl}
 
 Show your ticket QR code at the entrance check-in desk for admission. Keep this email handy!
 
+Your team's referral codes are on your status page.
+
 Best regards,
 Vulcan Club Organizing Team
 Sender: nexcell_rathinam@msot.org`;
