@@ -249,7 +249,32 @@ td > span { margin-top: 4px; }
 .coupon-card__stats { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid #1f1f1f; border-bottom: 1px solid #1f1f1f; }
 .coupon-stat-item { display: flex; justify-content: space-between; font-size: 12px; color: #b4b4b4; }
 .coupon-stat-item strong { color: #fff; }
-.coupon-card__actions { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 8px; }
+/* Referrals Operations & Leaderboard */
+.referrals-section { scroll-margin-top: 24px; margin-top: 30px; padding: 24px; background: #111; border-radius: 10px; border: 1px solid #1a1a1a; }
+.referrals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 18px; }
+.referral-stat-box { background: #161616; border: 1px solid #242424; border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+.referral-stat-box__label { font-size: 11.5px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.referral-stat-box__value { font-size: 26px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+.referral-stat-box__sub { font-size: 12px; color: #777; }
+
+.type-pill { display: inline-flex; align-items: center; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; }
+.type-pill--club { background: rgba(59, 130, 246, 0.12); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.25); }
+.type-pill--mirai { background: rgba(142, 237, 75, 0.12); color: #8eed4b; border: 1px solid rgba(142, 237, 75, 0.25); }
+.type-pill--both { background: rgba(198, 242, 78, 0.18); color: #c6f24e; border: 1px solid rgba(198, 242, 78, 0.4); }
+
+.rank-badge { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #222; color: #fff; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rank-badge--1 { background: #c6f24e; color: #000; }
+.rank-badge--2 { background: #e2e8f0; color: #000; }
+.rank-badge--3 { background: #ff9a4d; color: #000; }
+
+.copy-mini-btn { background: #222; border: 1px solid #333; color: #ccc; border-radius: 4px; font-size: 11px; padding: 2px 6px; cursor: pointer; transition: all 150ms ease; }
+.copy-mini-btn:hover { background: #333; color: #fff; }
+.copy-mini-btn--copied { background: rgba(198, 242, 78, 0.2); color: #c6f24e; border-color: rgba(198, 242, 78, 0.4); }
+
+.code-display { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 12.5px; font-weight: 700; color: #ff9a4d; background: rgba(255, 154, 77, 0.1); padding: 2px 7px; border-radius: 4px; border: 1px solid rgba(255, 154, 77, 0.25); }
+
+.modal-content--large { width: min(100%, 780px); }
+.drilldown-table { margin-top: 16px; border: 1px solid #222; border-radius: 6px; overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }

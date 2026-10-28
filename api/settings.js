@@ -54,6 +54,10 @@ export default async function handler(request, response) {
       upiId,
       opensAt,
       closesAt,
+      referralProgramActive,
+      eligibleCollegeName,
+      referralRewardText,
+      miraiEmailDomain,
     } = body;
 
     try {
@@ -70,6 +74,10 @@ export default async function handler(request, response) {
           upiId: String(upiId || 'himangshuyadav2@oksbi').trim(),
           opensAt: opensAt ? new Date(opensAt) : null,
           closesAt: closesAt ? new Date(closesAt) : null,
+          referralProgramActive: referralProgramActive !== undefined ? Boolean(referralProgramActive) : true,
+          eligibleCollegeName: String(eligibleCollegeName || 'Mirai School of Technology').trim(),
+          referralRewardText: String(referralRewardText || '').trim(),
+          miraiEmailDomain: String(miraiEmailDomain || '@mirai.edu.in').trim(),
         },
         update: {
           eventName: eventName !== undefined ? String(eventName).trim() : undefined,
@@ -81,6 +89,10 @@ export default async function handler(request, response) {
           upiId: upiId !== undefined ? String(upiId).trim() : undefined,
           opensAt: opensAt !== undefined ? (opensAt ? new Date(opensAt) : null) : undefined,
           closesAt: closesAt !== undefined ? (closesAt ? new Date(closesAt) : null) : undefined,
+          referralProgramActive: referralProgramActive !== undefined ? Boolean(referralProgramActive) : undefined,
+          eligibleCollegeName: eligibleCollegeName !== undefined ? String(eligibleCollegeName).trim() : undefined,
+          referralRewardText: referralRewardText !== undefined ? String(referralRewardText).trim() : undefined,
+          miraiEmailDomain: miraiEmailDomain !== undefined ? String(miraiEmailDomain).trim() : undefined,
         },
       });
 
@@ -93,6 +105,10 @@ export default async function handler(request, response) {
           maxCapacity: updated.maxCapacity,
           ticketPrice: updated.ticketPrice,
           upiId: updated.upiId,
+          referralProgramActive: updated.referralProgramActive,
+          eligibleCollegeName: updated.eligibleCollegeName,
+          referralRewardText: updated.referralRewardText,
+          miraiEmailDomain: updated.miraiEmailDomain,
         },
       });
 

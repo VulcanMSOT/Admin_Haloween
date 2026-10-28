@@ -36,6 +36,7 @@ export default async function handler(request, response) {
             { utr: { contains: search, mode: 'insensitive' } },
             { paymentReference: { contains: search, mode: 'insensitive' } },
             { couponCode: { contains: search, mode: 'insensitive' } },
+            { referralCode: { contains: search, mode: 'insensitive' } },
             {
               members: {
                 some: {
@@ -58,7 +59,16 @@ export default async function handler(request, response) {
         where,
         take: 300,
         orderBy: { createdAt: 'desc' },
-        include: { members: { orderBy: { position: 'asc' } } },
+        include: {
+          members: { orderBy: { position: 'asc' } },
+          referral: {
+            include: {
+              referrer: {
+                select: { id: true, name: true, code: true, email: true, type: true },
+              },
+            },
+          },
+        },
       }),
       prisma.registration.groupBy({ by: ['paymentStatus'], _count: { _all: true } }),
       prisma.registration.count({ where: { checkedInAt: { not: null } } }),

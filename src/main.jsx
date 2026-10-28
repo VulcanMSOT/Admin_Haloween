@@ -313,7 +313,7 @@ function Login({ onSignedIn }) {
 // -------------------------------------------------------------
 // Dashboard Overview Component
 // -------------------------------------------------------------
-function Dashboard({ stats, onNavigate }) {
+function Dashboard({ stats, referralSummary, onNavigate }) {
   return (
     <div className="dashboard-grid">
       <article className="stat-card stat-card--accent">
@@ -325,6 +325,24 @@ function Dashboard({ stats, onNavigate }) {
             ₹{stats.discountsGiven?.toLocaleString('en-IN')} discounts given ({stats.couponTeamsCount || 0} teams)
           </span>
         )}
+      </article>
+
+      <article className="stat-card" onClick={() => onNavigate('referrals')} style={{ cursor: 'pointer', borderColor: 'rgba(198, 242, 78, 0.3)' }}>
+        <span className="stat-card__label">Confirmed Referrals</span>
+        <strong className="stat-card__value" style={{ color: '#c6f24e' }}>
+          {referralSummary?.totalReferrals?.confirmed ?? 0}
+        </strong>
+        <span className="stat-card__sub">
+          {referralSummary?.conversionRate ? `${referralSummary.conversionRate} of confirmed teams from referrals →` : 'Referral leaderboard →'}
+        </span>
+      </article>
+
+      <article className="stat-card" onClick={() => onNavigate('referrals')} style={{ cursor: 'pointer' }}>
+        <span className="stat-card__label">Active Referrers</span>
+        <strong className="stat-card__value">{referralSummary?.activeReferrers ?? 0}</strong>
+        <span className="stat-card__sub">
+          {referralSummary?.clubMembersCount || 0} club · {referralSummary?.miraiStudentsCount || 0} mirai →
+        </span>
       </article>
 
       <article className="stat-card" onClick={() => onNavigate('coupons')} style={{ cursor: 'pointer' }}>
@@ -704,6 +722,13 @@ function PaymentQueue({ registrations, onActionComplete, onOpenEmail }) {
                 <span className="members-inline">
                   {r.members.map((m) => `${m.fullName} (${m.college})`).join(' · ')}
                 </span>
+                {r.referral?.referrer && (
+                  <div style={{ marginTop: '4px' }}>
+                    <span style={{ fontSize: '11px', color: '#c6f24e', background: 'rgba(198, 242, 78, 0.1)', padding: '2px 7px', borderRadius: '4px', border: '1px solid rgba(198, 242, 78, 0.25)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      Referred by: {r.referral.referrer.name} (<code>{r.referral.referrer.code}</code>)
+                    </span>
+                  </div>
+                )}
                 {r.duplicateUtr && (
                   <span className="warn-badge">⚠️ Duplicate UTR submitted on multiple teams!</span>
                 )}
@@ -1530,6 +1555,13 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
                   <td>
                     <strong>{r.teamName}</strong>
                     <span className="muted-text">{formatDate(r.createdAt)}</span>
+                    {r.referral?.referrer && (
+                      <div style={{ marginTop: '3px' }}>
+                        <span style={{ fontSize: '11px', color: '#c6f24e', background: 'rgba(198, 242, 78, 0.1)', padding: '1px 6px', borderRadius: '4px', border: '1px solid rgba(198, 242, 78, 0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          Ref: {r.referral.referrer.name} (<code>{r.referral.referrer.code}</code>)
+                        </span>
+                      </div>
+                    )}
                   </td>
                   <td>
                     <span className={`status status--${r.paymentStatus.toLowerCase()}`}>
@@ -1933,10 +1965,66 @@ function SettingsView({ onActionComplete }) {
               />
             </label>
           </div>
+        </div>
 
-          <div className="modal-actions" style={{ marginTop: '16px' }}>
+        <div className="settings-card" style={{ gridColumn: '1 / -1' }}>
+          <h3>Referral Program Configuration</h3>
+          <div className="toggle-row">
+            <span>Referral program active:</span>
+            <label className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={Boolean(settings?.referralProgramActive ?? true)}
+                onChange={(e) => setSettings({ ...settings, referralProgramActive: e.target.checked })}
+              />
+              <span className="toggle-slider" />
+            </label>
+          </div>
+          <small style={{ color: settings?.referralProgramActive !== false ? '#c6f24e' : '#ff9aa0' }}>
+            {settings?.referralProgramActive !== false ? '● Referral validation and code generation is ACTIVE' : '○ Referral program is PAUSED'}
+          </small>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginTop: '16px' }}>
+            <label htmlFor="eligible-college-input">
+              Eligible College Name (strict match)
+              <input
+                id="eligible-college-input"
+                type="text"
+                value={settings?.eligibleCollegeName || 'Mirai School of Technology'}
+                onChange={(e) => setSettings({ ...settings, eligibleCollegeName: e.target.value })}
+                required
+              />
+            </label>
+
+            <label htmlFor="mirai-domain-input">
+              Mirai Student Email Domain
+              <input
+                id="mirai-domain-input"
+                type="text"
+                value={settings?.miraiEmailDomain || '@mirai.edu.in'}
+                onChange={(e) => setSettings({ ...settings, miraiEmailDomain: e.target.value })}
+                required
+              />
+            </label>
+          </div>
+
+          <label htmlFor="reward-text-input" style={{ marginTop: '16px' }}>
+            Public Referral Reward Notice (optional)
+            <input
+              id="reward-text-input"
+              type="text"
+              placeholder="Leave empty to hide from public pages"
+              value={settings?.referralRewardText || ''}
+              onChange={(e) => setSettings({ ...settings, referralRewardText: e.target.value })}
+            />
+            <small className="muted-text" style={{ display: 'block', marginTop: '4px' }}>
+              If left empty, no reward message or promise is shown on public registration or ticket pages.
+            </small>
+          </label>
+
+          <div className="modal-actions" style={{ marginTop: '20px' }}>
             <button type="submit" disabled={saving}>
-              {saving ? 'Saving changes…' : 'Save Event Settings'}
+              {saving ? 'Saving changes…' : 'Save Event & Referral Settings'}
             </button>
           </div>
         </div>
@@ -2231,6 +2319,940 @@ function CouponsView({ onActionComplete }) {
 }
 
 // -------------------------------------------------------------
+// Referrals Management & Leaderboard View
+// -------------------------------------------------------------
+function CopyButton({ text, label = 'Copy' }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    if (!text) return;
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button
+      type="button"
+      className={`copy-mini-btn ${copied ? 'copy-mini-btn--copied' : ''}`}
+      onClick={handleCopy}
+      title={`Copy ${text}`}
+    >
+      {copied ? 'Copied' : label}
+    </button>
+  );
+}
+
+function AddClubMemberModal({ onClose, onAdded }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const result = await api('referrals-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add_club_member', name, email, phone }),
+      });
+      onAdded(result.message);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>Add Vulcan Club Member</h3>
+          <p>Club members get an active referral code (VULCAN-XXXXXX) to share with teams.</p>
+        </div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <form onSubmit={handleSubmit}>
+          <label>
+            Full Name
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Aditi Sharma"
+            />
+          </label>
+          <label>
+            Email Address
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="aditi@example.com"
+            />
+          </label>
+          <label>
+            Phone Number (optional)
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="10-digit mobile number"
+            />
+          </label>
+          <div className="modal-actions">
+            <button type="button" className="quiet" onClick={onClose} disabled={busy}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-approve" disabled={busy}>
+              {busy ? 'Adding…' : 'Add Club Member'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ImportClubMembersModal({ onClose, onImported }) {
+  const [csvText, setCsvText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [summary, setSummary] = useState(null);
+
+  const parseCsv = (text) => {
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) return [];
+    const firstLower = lines[0].toLowerCase();
+    const startIndex = (firstLower.includes('name') || firstLower.includes('email')) ? 1 : 0;
+    const parsed = [];
+    for (let i = startIndex; i < lines.length; i++) {
+      const parts = lines[i].split(',').map((p) => p.trim().replace(/^["']|["']$/g, ''));
+      if (parts.length >= 2) {
+        parsed.push({
+          name: parts[0],
+          email: parts[1],
+          phone: parts[2] || '',
+        });
+      }
+    }
+    return parsed;
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setCsvText(event.target?.result || '');
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImport = async (e) => {
+    e.preventDefault();
+    const members = parseCsv(csvText);
+    if (!members.length) {
+      setError('Please provide at least one valid row in "name, email, phone" format.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    setSummary(null);
+    try {
+      const result = await api('referrals-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'import_club_members', members }),
+      });
+      setSummary(result.summary);
+      onImported();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const parsedCount = parseCsv(csvText).length;
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-content modal-content--large" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>Bulk Import Vulcan Club Members</h3>
+          <p>Paste CSV content or select a file with columns: <code>name, email, phone</code></p>
+        </div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        {summary && (
+          <div className="pricing-summary-card" style={{ marginBottom: '16px' }}>
+            <span style={{ color: '#c6f24e', fontWeight: 600 }}>Import Results:</span>
+            <span className="summary-line"><span>New Club Members Added:</span> <strong>{summary.added}</strong></span>
+            <span className="summary-line"><span>Existing Mirai Students Upgraded to Both:</span> <strong>{summary.upgraded}</strong></span>
+            <span className="summary-line"><span>Already Active Club Members (Skipped):</span> <strong>{summary.skipped}</strong></span>
+            {summary.errors?.length > 0 && (
+              <div style={{ marginTop: '8px', color: '#ff9aa0', fontSize: '12px' }}>
+                <strong>Errors ({summary.errors.length}):</strong>
+                <ul>{summary.errors.slice(0, 5).map((err, idx) => <li key={idx}>{err}</li>)}</ul>
+              </div>
+            )}
+          </div>
+        )}
+        <form onSubmit={handleImport}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <span className="edit-mini-btn" style={{ padding: '6px 12px' }}>Choose CSV File</span>
+              <input type="file" accept=".csv,text/csv" onChange={handleFileUpload} style={{ display: 'none' }} />
+            </label>
+            <span style={{ fontSize: '12px', color: '#888' }}>{parsedCount} valid rows detected</span>
+          </div>
+
+          <label style={{ marginTop: '10px' }}>
+            CSV Data (Header optional: <code>name, email, phone</code>)
+            <textarea
+              rows={8}
+              value={csvText}
+              onChange={(e) => setCsvText(e.target.value)}
+              placeholder="Aditi Sharma, aditi@example.com, 9876543210&#10;Rahul Varma, rahul@example.com, 9876543211"
+              style={{ fontFamily: 'ui-monospace, monospace', fontSize: '12px' }}
+            />
+          </label>
+
+          <div className="modal-actions">
+            <button type="button" className="quiet" onClick={onClose} disabled={busy}>
+              Close
+            </button>
+            <button type="submit" className="btn-approve" disabled={busy || parsedCount === 0}>
+              {busy ? 'Importing…' : `Import ${parsedCount} Members`}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function DeactivateReferrerModal({ referrer, onClose, onUpdated }) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!referrer) return null;
+
+  const handleDeactivate = async (e) => {
+    e.preventDefault();
+    if (!reason.trim()) {
+      setError('A reason is required to deactivate a referrer.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const result = await api('referrals-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'toggle_active',
+          referrerId: referrer.id,
+          active: false,
+          reason,
+        }),
+      });
+      onUpdated(result.message);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>Deactivate Referrer</h3>
+          <p>Deactivating <strong>{referrer.name}</strong> ({referrer.code}) prevents this code from being used for any new registrations.</p>
+        </div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <form onSubmit={handleDeactivate}>
+          <label>
+            Reason for Deactivation (required)
+            <textarea
+              rows={3}
+              required
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Member left club, code compromised, or misuse detected"
+            />
+          </label>
+          <div className="modal-actions">
+            <button type="button" className="quiet" onClick={onClose} disabled={busy}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-danger" disabled={busy}>
+              {busy ? 'Deactivating…' : 'Deactivate Code'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ReissueCodeModal({ referrer, onClose, onUpdated }) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!referrer) return null;
+
+  const handleReissue = async (e) => {
+    e.preventDefault();
+    if (!reason.trim()) {
+      setError('A reason is required to reissue a referral code.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const result = await api('referrals-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reissue_code',
+          referrerId: referrer.id,
+          reason,
+        }),
+      });
+      onUpdated(result.message);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>Reissue Referral Code</h3>
+          <p>Generate a brand-new code for <strong>{referrer.name}</strong>. Their previous code (<code>{referrer.code}</code>) will become invalid.</p>
+        </div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <form onSubmit={handleReissue}>
+          <label>
+            Reason for Reissue (required)
+            <textarea
+              rows={3}
+              required
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Code publicly leaked, spelling corrected, or user request"
+            />
+          </label>
+          <div className="modal-actions">
+            <button type="button" className="quiet" onClick={onClose} disabled={busy}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-approve" disabled={busy}>
+              {busy ? 'Reissuing…' : 'Generate New Code'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ReferralDrilldownModal({ referrerId, onClose, onActionComplete }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [overrideItem, setOverrideItem] = useState(null);
+  const [notice, setNotice] = useState('');
+
+  const loadDetails = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api(`referrals-admin?referrerId=${referrerId}`);
+      setData(res.referrer);
+      setError('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [referrerId]);
+
+  useEffect(() => {
+    loadDetails();
+  }, [loadDetails]);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-content modal-content--large" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h3>Referral Drill-Down: {data?.name || 'Loading…'}</h3>
+            <p>
+              Code: <code className="code-display">{data?.code}</code> · Email: {data?.email}
+            </p>
+          </div>
+          <button type="button" className="quiet" onClick={onClose} style={{ minHeight: '30px', padding: '0 10px' }}>✕</button>
+        </div>
+
+        {error && <p className="form-error" role="alert">{error}</p>}
+        {notice && <p className="form-notice" role="status">{notice}</p>}
+
+        {loading ? (
+          <p className="loading" style={{ minHeight: '120px' }}>Loading referred teams…</p>
+        ) : (
+          <div>
+            <div style={{ display: 'flex', gap: '12px', margin: '14px 0', fontSize: '13px' }}>
+              <span><b>{data?.referrals?.filter((r) => r.status === 'confirmed').length || 0}</b> Confirmed</span>
+              <span><b>{data?.referrals?.filter((r) => r.status === 'pending').length || 0}</b> Pending</span>
+              <span><b>{data?.referrals?.filter((r) => r.status === 'reversed').length || 0}</b> Reversed</span>
+            </div>
+
+            <div className="table-wrap drilldown-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Team</th>
+                    <th>Leader</th>
+                    <th>Payment</th>
+                    <th>Referral Status</th>
+                    <th>Timestamps</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(!data?.referrals || data.referrals.length === 0) ? (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', color: '#777', padding: '24px' }}>No teams have registered using this code yet.</td>
+                    </tr>
+                  ) : (
+                    data.referrals.map((ref) => {
+                      const team = ref.referredTeam;
+                      const leader = team?.members?.[0];
+                      return (
+                        <tr key={ref.id}>
+                          <td>
+                            <strong>{team?.teamName || 'Unknown'}</strong>
+                            <small className="muted-text" style={{ display: 'block' }}>{team?.teamId || team?.id}</small>
+                          </td>
+                          <td>
+                            <span>{leader?.fullName || '—'}</span>
+                            <small className="muted-text" style={{ display: 'block' }}>{leader?.email || '—'}</small>
+                          </td>
+                          <td>
+                            <span className={`status status--${team?.paymentStatus?.toLowerCase()}`}>
+                              {statusLabels[team?.paymentStatus] || team?.paymentStatus}
+                            </span>
+                            <small className="muted-text" style={{ display: 'block' }}>₹{team?.amount}</small>
+                          </td>
+                          <td>
+                            <span className={`status ${ref.status === 'confirmed' ? 'status--paid' : ref.status === 'reversed' ? 'status--rejected' : 'status--pending_review'}`}>
+                              {ref.status}
+                            </span>
+                            {ref.reversedReason && (
+                              <small className="reject-inline" style={{ display: 'block' }}>{ref.reversedReason}</small>
+                            )}
+                          </td>
+                          <td style={{ fontSize: '11px', color: '#888' }}>
+                            <div>Reg: {formatDate(ref.createdAt)}</div>
+                            {ref.confirmedAt && <div style={{ color: '#c6f24e' }}>Conf: {formatDate(ref.confirmedAt)}</div>}
+                            {ref.reversedAt && <div style={{ color: '#ff8888' }}>Rev: {formatDate(ref.reversedAt)}</div>}
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="table-action"
+                              onClick={() => setOverrideItem(ref)}
+                            >
+                              Override
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        <div className="modal-actions">
+          <button type="button" className="quiet" onClick={onClose}>Close</button>
+        </div>
+
+        {overrideItem && (
+          <ManualOverrideModal
+            referral={overrideItem}
+            onClose={() => setOverrideItem(null)}
+            onUpdated={(msg) => {
+              setNotice(msg);
+              loadDetails();
+              onActionComplete();
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ManualOverrideModal({ referral, onClose, onUpdated }) {
+  const [targetStatus, setTargetStatus] = useState(referral.status === 'confirmed' ? 'reversed' : 'confirmed');
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleOverride = async (e) => {
+    e.preventDefault();
+    if (!reason.trim()) {
+      setError('A reason is required for manual override.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const result = await api('referrals-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'manual_override',
+          referralId: referral.id,
+          status: targetStatus,
+          reason,
+        }),
+      });
+      onUpdated(result.message);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 1100 }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>Manual Referral Status Override</h3>
+          <p>Current status: <strong>{referral.status}</strong></p>
+        </div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <form onSubmit={handleOverride}>
+          <label>
+            New Status
+            <select value={targetStatus} onChange={(e) => setTargetStatus(e.target.value)}>
+              <option value="confirmed">confirmed (Count as successful referral)</option>
+              <option value="reversed">reversed (Disqualify referral)</option>
+              <option value="pending">pending (Await payment review)</option>
+            </select>
+          </label>
+          <label>
+            Reason for Override (required, recorded in Audit Log)
+            <textarea
+              rows={3}
+              required
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Offline verification, organizer exception, or disputed referral"
+            />
+          </label>
+          <div className="modal-actions">
+            <button type="button" className="quiet" onClick={onClose} disabled={busy}>Cancel</button>
+            <button type="submit" className="btn-approve" disabled={busy}>
+              {busy ? 'Updating…' : 'Apply Override'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ReferralsView({ onActionComplete }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [drilldownReferrerId, setDrilldownReferrerId] = useState(null);
+  const [deactivatingReferrer, setDeactivatingReferrer] = useState(null);
+  const [reissuingReferrer, setReissuingReferrer] = useState(null);
+  const [exporting, setExporting] = useState(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api('referrals-admin');
+      setData(res);
+      setError('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleExportCsv = async (exportType) => {
+    try {
+      setExporting(true);
+      const result = await api('referrals-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'export_csv', exportType }),
+      });
+      const blob = new Blob([result.csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', result.filename || `export-${exportType}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      setError(`Export failed: ${err.message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleToggleReactivate = async (ref) => {
+    try {
+      const result = await api('referrals-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle_active', referrerId: ref.id, active: true }),
+      });
+      setNotice(result.message);
+      loadData();
+      onActionComplete();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const filteredLeaderboard = (data?.leaderboard || []).filter((ref) => {
+    if (typeFilter !== 'all' && ref.type !== typeFilter) return false;
+    if (statusFilter === 'active' && !ref.active) return false;
+    if (statusFilter === 'deactivated' && ref.active) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const matchName = ref.name.toLowerCase().includes(q);
+      const matchEmail = ref.email.toLowerCase().includes(q);
+      const matchPhone = ref.phone && ref.phone.includes(q);
+      const matchCode = ref.code.toLowerCase().includes(q);
+      if (!matchName && !matchEmail && !matchPhone && !matchCode) return false;
+    }
+    return true;
+  });
+
+  return (
+    <section className="referrals-section">
+      <div className="section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h2>Referrals & Leaderboard</h2>
+          <p>
+            Ranked primarily by confirmed team referrals. Ties are automatically broken by earliest confirmed referral time.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button type="button" className="btn-approve" onClick={() => setShowAddModal(true)}>
+            + Add Club Member
+          </button>
+          <button type="button" className="table-action" onClick={() => setShowImportModal(true)}>
+            Bulk Import CSV
+          </button>
+          <button
+            type="button"
+            className="table-action"
+            onClick={() => handleExportCsv('leaderboard')}
+            disabled={exporting}
+          >
+            {exporting ? 'Exporting…' : 'Export Leaderboard (CSV)'}
+          </button>
+          <button
+            type="button"
+            className="table-action"
+            onClick={() => handleExportCsv('all_referrals')}
+            disabled={exporting}
+          >
+            {exporting ? 'Exporting…' : 'Export All Referrals (CSV)'}
+          </button>
+        </div>
+      </div>
+
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {notice && <p className="form-notice" role="status">{notice}</p>}
+
+      {/* Summary Cards */}
+      <div className="referrals-grid">
+        <div className="referral-stat-box">
+          <span className="referral-stat-box__label">Total Referrers</span>
+          <strong className="referral-stat-box__value">{data?.summary?.totalReferrers || 0}</strong>
+          <span className="referral-stat-box__sub">
+            {data?.summary?.clubMembersCount || 0} club · {data?.summary?.miraiStudentsCount || 0} mirai
+          </span>
+        </div>
+
+        <div className="referral-stat-box">
+          <span className="referral-stat-box__label">Active Referrers</span>
+          <strong className="referral-stat-box__value" style={{ color: '#c6f24e' }}>
+            {data?.summary?.activeReferrers || 0}
+          </strong>
+          <span className="referral-stat-box__sub">
+            {data?.summary?.deactivatedReferrers || 0} deactivated
+          </span>
+        </div>
+
+        <div className="referral-stat-box">
+          <span className="referral-stat-box__label">Confirmed Referrals</span>
+          <strong className="referral-stat-box__value" style={{ color: '#c6f24e' }}>
+            {data?.summary?.totalReferrals?.confirmed || 0}
+          </strong>
+          <span className="referral-stat-box__sub">
+            {data?.summary?.totalReferrals?.pending || 0} pending · {data?.summary?.totalReferrals?.reversed || 0} reversed
+          </span>
+        </div>
+
+        <div className="referral-stat-box">
+          <span className="referral-stat-box__label">Referral Conversion</span>
+          <strong className="referral-stat-box__value" style={{ color: '#ff9a4d' }}>
+            {data?.summary?.conversionRate || '0.0%'}
+          </strong>
+          <span className="referral-stat-box__sub">
+            {data?.summary?.confirmedTeamsFromReferrals || 0} of {data?.summary?.totalPaidRegistrations || 0} confirmed teams
+          </span>
+        </div>
+      </div>
+
+      {/* Filter Tools */}
+      <div className="table-tools" style={{ marginTop: '24px' }}>
+        <input
+          type="search"
+          placeholder="Search by name, email, phone, or code…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="all">All Referrer Types</option>
+            <option value="club_member">Vulcan Club Members</option>
+            <option value="mirai_student">Mirai Students</option>
+            <option value="both">Club Member & Mirai</option>
+          </select>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="all">All Statuses</option>
+            <option value="active">Active Only</option>
+            <option value="deactivated">Deactivated Only</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Leaderboard Table */}
+      <div className="table-wrap" style={{ marginTop: '12px' }}>
+        <table>
+          <thead>
+            <tr>
+              <th style={{ width: '40px' }}>Rank</th>
+              <th>Referrer</th>
+              <th>Referral Code</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th style={{ textAlign: 'right' }}>Confirmed</th>
+              <th style={{ textAlign: 'right' }}>Pending</th>
+              <th style={{ textAlign: 'right' }}>Reversed</th>
+              <th style={{ textAlign: 'right' }}>Total</th>
+              <th>Earliest Confirmed</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={11} style={{ textAlign: 'center', padding: '30px' }}>Loading referral leaderboard…</td></tr>
+            ) : filteredLeaderboard.length === 0 ? (
+              <tr><td colSpan={11} style={{ textAlign: 'center', padding: '30px', color: '#777' }}>No referrers found matching your filters.</td></tr>
+            ) : (
+              filteredLeaderboard.map((ref) => {
+                const rankClass = ref.rank <= 3 ? `rank-badge--${ref.rank}` : '';
+                return (
+                  <tr key={ref.id} style={{ opacity: ref.active ? 1 : 0.6 }}>
+                    <td>
+                      <span className={`rank-badge ${rankClass}`}>{ref.rank}</span>
+                    </td>
+                    <td>
+                      <strong>{ref.name}</strong>
+                      <span className="muted-text" style={{ fontSize: '11px', display: 'block' }}>{ref.email}</span>
+                      {ref.phone && <span className="muted-text" style={{ fontSize: '11px', display: 'block' }}>{ref.phone}</span>}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <code className="code-display">{ref.code}</code>
+                        <CopyButton text={ref.code} />
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`type-pill ${ref.type === 'both' ? 'type-pill--both' : ref.type === 'club_member' ? 'type-pill--club' : 'type-pill--mirai'}`}>
+                        {ref.type === 'both' ? 'Club & Mirai' : ref.type === 'club_member' ? 'Club Member' : 'Mirai Student'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`status ${ref.active ? 'status--paid' : 'status--rejected'}`}>
+                        {ref.active ? 'Active' : 'Deactivated'}
+                      </span>
+                      {ref.deactivatedReason && (
+                        <small className="reject-inline" style={{ display: 'block', maxWidth: '160px' }}>
+                          {ref.deactivatedReason}
+                        </small>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: '#c6f24e', fontSize: '15px' }}>
+                      {ref.confirmedCount}
+                    </td>
+                    <td style={{ textAlign: 'right', color: '#ffbd80' }}>
+                      {ref.pendingCount}
+                    </td>
+                    <td style={{ textAlign: 'right', color: '#ff9aa0' }}>
+                      {ref.reversedCount}
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                      {ref.totalCount}
+                    </td>
+                    <td style={{ fontSize: '11px', color: '#888' }}>
+                      {formatDate(ref.earliestConfirmedAt)}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                        <button
+                          type="button"
+                          className="table-action"
+                          onClick={() => setDrilldownReferrerId(ref.id)}
+                          title="View all teams referred by this person"
+                        >
+                          Teams ({ref.totalCount})
+                        </button>
+                        {ref.active ? (
+                          <button
+                            type="button"
+                            className="table-action table-action--danger"
+                            onClick={() => setDeactivatingReferrer(ref)}
+                            title="Deactivate this referral code"
+                          >
+                            Deactivate
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="table-action"
+                            style={{ color: '#c6f24e' }}
+                            onClick={() => handleToggleReactivate(ref)}
+                            title="Reactivate this referral code"
+                          >
+                            Reactivate
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="table-action"
+                          onClick={() => setReissuingReferrer(ref)}
+                          title="Generate a new referral code for this person"
+                        >
+                          Reissue
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {showAddModal && (
+        <AddClubMemberModal
+          onClose={() => setShowAddModal(false)}
+          onAdded={(msg) => {
+            setNotice(msg);
+            loadData();
+            onActionComplete();
+          }}
+        />
+      )}
+
+      {showImportModal && (
+        <ImportClubMembersModal
+          onClose={() => setShowImportModal(false)}
+          onImported={() => {
+            loadData();
+            onActionComplete();
+          }}
+        />
+      )}
+
+      {drilldownReferrerId && (
+        <ReferralDrilldownModal
+          referrerId={drilldownReferrerId}
+          onClose={() => setDrilldownReferrerId(null)}
+          onActionComplete={() => {
+            loadData();
+            onActionComplete();
+          }}
+        />
+      )}
+
+      {deactivatingReferrer && (
+        <DeactivateReferrerModal
+          referrer={deactivatingReferrer}
+          onClose={() => setDeactivatingReferrer(null)}
+          onUpdated={(msg) => {
+            setNotice(msg);
+            loadData();
+            onActionComplete();
+          }}
+        />
+      )}
+
+      {reissuingReferrer && (
+        <ReissueCodeModal
+          referrer={reissuingReferrer}
+          onClose={() => setReissuingReferrer(null)}
+          onUpdated={(msg) => {
+            setNotice(msg);
+            loadData();
+            onActionComplete();
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+// -------------------------------------------------------------
 // Main App Component with Tabs
 // -------------------------------------------------------------
 export default function App() {
@@ -2240,6 +3262,7 @@ export default function App() {
   const [registrations, setRegistrations] = useState([]);
   const [stats, setStats] = useState({});
   const [totals, setTotals] = useState({});
+  const [referralSummary, setReferralSummary] = useState(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [emailModalItem, setEmailModalItem] = useState(null);
@@ -2255,6 +3278,10 @@ export default function App() {
       setStats(result.stats || {});
       setTotals(result.totals || {});
       setLoadError('');
+
+      api('referrals-admin')
+        .then((refRes) => setReferralSummary(refRes.summary))
+        .catch(() => {});
     } catch (error) {
       setLoadError(error.message);
     }
@@ -2282,7 +3309,7 @@ export default function App() {
   useEffect(() => {
     const handleHash = () => {
       const h = window.location.hash.replace('#', '');
-      if (['dashboard', 'payments', 'tickets', 'checkin', 'teams', 'coupons', 'settings'].includes(h)) {
+      if (['dashboard', 'payments', 'tickets', 'checkin', 'teams', 'coupons', 'referrals', 'settings'].includes(h)) {
         setTab(h);
       }
     };
@@ -2359,6 +3386,13 @@ export default function App() {
             Coupons <span>{stats.couponTeamsCount || 0}</span>
           </a>
           <a
+            href="#referrals"
+            className={tab === 'referrals' ? 'is-active' : ''}
+            onClick={() => changeTab('referrals')}
+          >
+            Referrals <span>{referralSummary?.totalReferrals?.confirmed || 0}</span>
+          </a>
+          <a
             href="#settings"
             className={tab === 'settings' ? 'is-active' : ''}
             onClick={() => changeTab('settings')}
@@ -2393,7 +3427,7 @@ export default function App() {
 
         {loadError && <p className="form-error" role="alert">{loadError}</p>}
 
-        {tab === 'dashboard' && <Dashboard stats={stats} onNavigate={changeTab} />}
+        {tab === 'dashboard' && <Dashboard stats={stats} referralSummary={referralSummary} onNavigate={changeTab} />}
         {tab === 'payments' && (
           <PaymentQueue
             registrations={registrations}
@@ -2421,6 +3455,7 @@ export default function App() {
           />
         )}
         {tab === 'coupons' && <CouponsView onActionComplete={load} />}
+        {tab === 'referrals' && <ReferralsView onActionComplete={load} />}
         {tab === 'settings' && <SettingsView onActionComplete={load} />}
       </main>
 
