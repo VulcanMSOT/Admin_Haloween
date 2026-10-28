@@ -54,7 +54,7 @@ export default async function handler(request, response) {
   };
 
   try {
-    const [registrations, grouped, totalCheckedIn, confirmedEmailNotSent, paidRows] = await prisma.$transaction([
+    const [registrations, grouped, totalCheckedIn, confirmedEmailNotSent, paidRows] = await Promise.all([
       prisma.registration.findMany({
         where,
         take: 300,
