@@ -144,7 +144,7 @@ export async function validateReferralCode(rawCode, options = {}) {
   if (options.teamMembers && Array.isArray(options.teamMembers)) {
     const hasMirai = options.teamMembers.some((m) => {
       const col = String(m?.college || '').trim().toLowerCase();
-      return col === eligibleCollege;
+      return col.includes('mirai') || col === eligibleCollege;
     });
     if (hasMirai) {
       return { valid: false, error: 'Referral codes cannot be applied by Mirai School of Technology students.' };
