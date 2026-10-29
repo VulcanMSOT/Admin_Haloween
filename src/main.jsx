@@ -2036,6 +2036,19 @@ function SettingsView({ onActionComplete }) {
 // -------------------------------------------------------------
 // Coupons Management View
 // -------------------------------------------------------------
+function toLocalDatetimeInput(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const min = pad(d.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
 function CouponsView({ onActionComplete }) {
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2043,6 +2056,7 @@ function CouponsView({ onActionComplete }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState(null);
   const [newCoupon, setNewCoupon] = useState({
     code: '',
     type: 'flat',
@@ -2068,6 +2082,23 @@ function CouponsView({ onActionComplete }) {
   useEffect(() => {
     loadCoupons();
   }, [loadCoupons]);
+
+  const openEditModal = (coupon) => {
+    setError('');
+    setNotice('');
+    setEditingCoupon({
+      id: coupon.id,
+      originalCode: coupon.code,
+      code: coupon.code,
+      type: coupon.type || 'flat',
+      value: coupon.value,
+      maxUses: coupon.maxUses !== null && coupon.maxUses !== undefined ? String(coupon.maxUses) : '',
+      expiresAt: coupon.expiresAt ? toLocalDatetimeInput(coupon.expiresAt) : '',
+      active: Boolean(coupon.active),
+      usedCount: coupon.usedCount || 0,
+      registrationsCount: coupon.registrationsCount || 0,
+    });
+  };
 
   const toggleActive = async (coupon) => {
     setBusyId(coupon.id);
@@ -2141,6 +2172,37 @@ function CouponsView({ onActionComplete }) {
     }
   };
 
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingCoupon) return;
+    setBusyId(`edit-${editingCoupon.id}`);
+    setError('');
+    setNotice('');
+    try {
+      const res = await api('coupons', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingCoupon.id,
+          code: editingCoupon.code,
+          type: editingCoupon.type,
+          value: Number(editingCoupon.value),
+          maxUses: editingCoupon.maxUses !== '' && editingCoupon.maxUses !== null ? parseInt(editingCoupon.maxUses, 10) : null,
+          expiresAt: editingCoupon.expiresAt ? new Date(editingCoupon.expiresAt).toISOString() : null,
+          active: editingCoupon.active,
+        }),
+      });
+      setNotice(res.message || 'Coupon updated successfully.');
+      setEditingCoupon(null);
+      await loadCoupons();
+      onActionComplete();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId('');
+    }
+  };
+
   return (
     <section className="coupons-section">
       <div className="section-head">
@@ -2199,6 +2261,14 @@ function CouponsView({ onActionComplete }) {
                 <button
                   type="button"
                   className="table-action"
+                  onClick={() => openEditModal(c)}
+                  disabled={busyId === c.id || busyId === `edit-${c.id}`}
+                >
+                  ✎ Edit
+                </button>
+                <button
+                  type="button"
+                  className="table-action"
                   onClick={() => toggleActive(c)}
                   disabled={busyId === c.id}
                 >
@@ -2224,6 +2294,109 @@ function CouponsView({ onActionComplete }) {
         </div>
       )}
 
+      {/* Edit Coupon Modal */}
+      {editingCoupon && (
+        <div className="modal-backdrop" onClick={() => setEditingCoupon(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h3 style={{ margin: 0 }}>
+                Edit Coupon: <span className="coupon-code-badge" style={{ verticalAlign: 'middle', margin: 0 }}>{editingCoupon.originalCode}</span>
+              </h3>
+              <button
+                type="button"
+                className="quiet"
+                style={{ border: 'none', fontSize: '18px', cursor: 'pointer', padding: '0 4px', minHeight: 'auto' }}
+                onClick={() => setEditingCoupon(null)}
+              >
+                ✕
+              </button>
+            </div>
+            <p style={{ fontSize: '13px', color: '#b4b4b4', marginBottom: '14px' }}>
+              Update coupon code, discount rate, max uses, or expiration date. Used: <strong>{editingCoupon.usedCount}</strong> time(s).
+            </p>
+
+            <form onSubmit={handleEditSubmit}>
+              <label>
+                Coupon Code * (3-32 characters: letters, numbers, _, -)
+                <input
+                  type="text"
+                  value={editingCoupon.code}
+                  onChange={(e) => setEditingCoupon({ ...editingCoupon, code: e.target.value })}
+                  placeholder="e.g. last_minute"
+                  pattern="^[a-zA-Z0-9_-]{3,32}$"
+                  title="3-32 characters, only alphanumeric, hyphens, and underscores"
+                  required
+                />
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <label>
+                  Discount Type
+                  <select
+                    value={editingCoupon.type}
+                    onChange={(e) => setEditingCoupon({ ...editingCoupon, type: e.target.value })}
+                  >
+                    <option value="flat">Flat amount (₹)</option>
+                    <option value="percent">Percentage (%)</option>
+                  </select>
+                </label>
+                <label>
+                  Discount Value *
+                  <input
+                    type="number"
+                    min="1"
+                    max={editingCoupon.type === 'percent' ? '100' : undefined}
+                    value={editingCoupon.value}
+                    onChange={(e) => setEditingCoupon({ ...editingCoupon, value: e.target.value })}
+                    required
+                  />
+                </label>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <label>
+                  Max Uses (optional)
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Leave empty for unlimited"
+                    value={editingCoupon.maxUses}
+                    onChange={(e) => setEditingCoupon({ ...editingCoupon, maxUses: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Expiration Date (optional)
+                  <input
+                    type="datetime-local"
+                    value={editingCoupon.expiresAt}
+                    onChange={(e) => setEditingCoupon({ ...editingCoupon, expiresAt: e.target.value })}
+                  />
+                </label>
+              </div>
+
+              <label className="toggle-row" style={{ cursor: 'pointer', margin: '8px 0' }}>
+                <span>Coupon active (available to participants)</span>
+                <input
+                  type="checkbox"
+                  style={{ width: 'auto', minHeight: 'auto' }}
+                  checked={editingCoupon.active}
+                  onChange={(e) => setEditingCoupon({ ...editingCoupon, active: e.target.checked })}
+                />
+              </label>
+
+              <div className="modal-actions">
+                <button type="button" className="quiet" onClick={() => setEditingCoupon(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-approve" disabled={busyId === `edit-${editingCoupon.id}`}>
+                  {busyId === `edit-${editingCoupon.id}` ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Create Coupon Modal */}
       {showCreateModal && (
         <div className="modal-backdrop" onClick={() => setShowCreateModal(false)}>
@@ -2235,14 +2408,14 @@ function CouponsView({ onActionComplete }) {
 
             <form onSubmit={handleCreateSubmit}>
               <label>
-                Coupon Code * (4-32 characters: letters, numbers, _, -)
+                Coupon Code * (3-32 characters: letters, numbers, _, -)
                 <input
                   type="text"
                   value={newCoupon.code}
                   onChange={(e) => setNewCoupon({ ...newCoupon, code: e.target.value })}
                   placeholder="e.g. halloween_night"
-                  pattern="^[a-zA-Z0-9_-]{4,32}$"
-                  title="4-32 characters, only alphanumeric, hyphens, and underscores"
+                  pattern="^[a-zA-Z0-9_-]{3,32}$"
+                  title="3-32 characters, only alphanumeric, hyphens, and underscores"
                   required
                 />
               </label>

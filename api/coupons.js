@@ -3,7 +3,7 @@ import { prisma } from './_lib/prisma.js';
 import { requireSession } from './_lib/session.js';
 import { logAdminAction } from './_lib/audit.js';
 
-const CODE_REGEX = /^[a-zA-Z0-9_-]{4,32}$/;
+const CODE_REGEX = /^[a-zA-Z0-9_-]{3,32}$/;
 
 export default async function handler(request, response) {
   if (handleCors(request, response, ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'])) return;
@@ -51,7 +51,7 @@ export default async function handler(request, response) {
     const rawCode = String(code || '').trim();
     if (!CODE_REGEX.test(rawCode)) {
       return json(response, 400, {
-        error: 'Coupon code must be 4–32 characters and contain only letters, numbers, hyphens, and underscores.',
+        error: 'Coupon code must be 3–32 characters and contain only letters, numbers, hyphens, and underscores.',
       });
     }
 
@@ -132,9 +132,9 @@ export default async function handler(request, response) {
     }
   }
 
-  // 3. PATCH: Update coupon settings (toggle active, maxUses, expiresAt)
+  // 3. PATCH: Update coupon settings (code, type, value, toggle active, maxUses, expiresAt)
   if (method === 'PATCH') {
-    const { id, active, maxUses, expiresAt, value, type } = parseBody(request);
+    const { id, code, active, maxUses, expiresAt, value, type } = parseBody(request);
     if (!id) return json(response, 400, { error: 'Coupon ID is required.' });
 
     try {
@@ -144,6 +144,31 @@ export default async function handler(request, response) {
       if (!existing) return json(response, 404, { error: 'Coupon not found.' });
 
       const updateData = {};
+      const oldCode = existing.code;
+      let newCode = null;
+
+      if (code !== undefined) {
+        const rawCode = String(code || '').trim();
+        if (!CODE_REGEX.test(rawCode)) {
+          return json(response, 400, {
+            error: 'Coupon code must be 3–32 characters and contain only letters, numbers, hyphens, and underscores.',
+          });
+        }
+        const normalisedCode = rawCode.toLowerCase();
+        if (normalisedCode !== existing.code) {
+          const duplicate = await prisma.coupon.findUnique({
+            where: { code: normalisedCode },
+          });
+          if (duplicate && duplicate.id !== existing.id) {
+            return json(response, 400, {
+              error: `Coupon code "${normalisedCode}" already exists.`,
+            });
+          }
+          updateData.code = normalisedCode;
+          newCode = normalisedCode;
+        }
+      }
+
       if (active !== undefined) updateData.active = Boolean(active);
 
       if (maxUses !== undefined) {
@@ -170,14 +195,7 @@ export default async function handler(request, response) {
         }
       }
 
-      if (value !== undefined) {
-        const numVal = Number(value);
-        if (isNaN(numVal) || numVal <= 0) {
-          return json(response, 400, { error: 'Value must be positive.' });
-        }
-        updateData.value = numVal;
-      }
-
+      const targetType = type !== undefined ? type : existing.type;
       if (type !== undefined) {
         if (!['flat', 'percent'].includes(type)) {
           return json(response, 400, { error: 'Type must be flat or percent.' });
@@ -185,16 +203,36 @@ export default async function handler(request, response) {
         updateData.type = type;
       }
 
+      if (value !== undefined) {
+        const numVal = Number(value);
+        if (isNaN(numVal) || numVal <= 0) {
+          return json(response, 400, { error: 'Value must be positive.' });
+        }
+        if (targetType === 'percent' && numVal > 100) {
+          return json(response, 400, { error: 'Percentage discount cannot exceed 100%.' });
+        }
+        updateData.value = numVal;
+      }
+
       const updated = await prisma.coupon.update({
         where: { id: existing.id },
         data: updateData,
       });
+
+      // If code changed, cascade update to registrations that used the previous code
+      if (newCode && newCode !== oldCode) {
+        await prisma.registration.updateMany({
+          where: { couponCode: oldCode },
+          data: { couponCode: newCode },
+        });
+      }
 
       await logAdminAction({
         adminEmail: session.email,
         action: 'update_coupon',
         targetId: updated.id,
         details: {
+          previousCode: oldCode,
           code: updated.code,
           changes: updateData,
         },

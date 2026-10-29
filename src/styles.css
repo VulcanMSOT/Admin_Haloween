@@ -249,6 +249,7 @@ td > span { margin-top: 4px; }
 .coupon-card__stats { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid #1f1f1f; border-bottom: 1px solid #1f1f1f; }
 .coupon-stat-item { display: flex; justify-content: space-between; font-size: 12px; color: #b4b4b4; }
 .coupon-stat-item strong { color: #fff; }
+.coupon-card__actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: auto; }
 /* Referrals Operations & Leaderboard */
 .referrals-section { scroll-margin-top: 24px; margin-top: 30px; padding: 24px; background: #111; border-radius: 10px; border: 1px solid #1a1a1a; }
 .referrals-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 18px; }
