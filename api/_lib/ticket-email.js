@@ -106,7 +106,7 @@ export async function sendRejectionEmail(registration, rejectReason) {
 
   const orderRef = registration.orderRef || 'your order';
   const reasonText = rejectReason ? `Organiser note: ${rejectReason}` : 'The transaction reference could not be verified.';
-  const siteUrl = process.env.SITE_URL || 'https://vulcan-club.vercel.app';
+  const siteUrl = process.env.SITE_URL || 'https://www.vulcanclub.in';
   const resubmitUrl = `${siteUrl}/halloween-hack`;
 
   const payload = {

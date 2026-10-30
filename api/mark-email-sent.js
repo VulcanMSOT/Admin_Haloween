@@ -10,7 +10,7 @@ export default async function handler(request, response) {
   const session = requireSession(request, response);
   if (!session) return;
 
-  const { registrationId } = parseBody(request);
+  const { registrationId, status: nextStatus } = parseBody(request);
   if (!registrationId) return json(response, 400, { error: 'Registration ID is required.' });
 
   try {
@@ -20,31 +20,35 @@ export default async function handler(request, response) {
     if (!existing) return json(response, 404, { error: 'Registration not found.' });
 
     const now = new Date();
+    const isUnmark = nextStatus === 'pending';
     const updated = await prisma.registration.update({
       where: { id: existing.id },
-      data: {
-        emailStatus: 'sent',
-        emailSentBy: session.email || 'admin',
-        emailSentAt: now,
-        emailSentCount: { increment: 1 },
-      },
+      data: isUnmark
+        ? { emailStatus: 'pending' }
+        : {
+            emailStatus: 'sent',
+            emailSentBy: session.email || 'admin',
+            emailSentAt: now,
+            emailSentCount: { increment: 1 },
+          },
     });
 
     await logAdminAction({
       adminEmail: session.email,
-      action: 'mark_email_sent',
+      action: isUnmark ? 'unmark_email_sent' : 'mark_email_sent',
       targetId: updated.id,
       details: {
         teamId: updated.teamId || updated.orderRef,
+        emailStatus: updated.emailStatus,
         emailSentCount: updated.emailSentCount,
-        emailSentAt: now.toISOString(),
+        emailSentAt: isUnmark ? null : now.toISOString(),
       },
     });
 
     return json(response, 200, {
       ok: true,
       registration: updated,
-      message: 'Email marked as sent.',
+      message: isUnmark ? 'Email marked as pending.' : 'Email marked as sent.',
     });
   } catch (error) {
     console.error('Mark email sent error:', error);

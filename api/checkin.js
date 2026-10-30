@@ -10,8 +10,11 @@ export default async function handler(request, response) {
   const session = requireSession(request, response);
   if (!session) return;
 
-  const rawCandidate = String(parseBody(request).ticketId || '').trim();
-  if (!rawCandidate) return json(response, 400, { error: 'Enter or scan a ticket ID or QR code.' });
+  const body = parseBody(request);
+  const rawCandidate = String(body.ticketId || body.search || '').trim();
+  const action = String(body.action || 'checkin').trim(); // 'lookup' | 'checkin' | 'undo'
+
+  if (!rawCandidate) return json(response, 400, { error: 'Enter or scan a ticket ID, team ID, or leader phone.' });
 
   // Clean candidate: handles "VHK-1001:TOKEN", "TOKEN", full URLs, etc.
   const cleanString = rawCandidate.split('/').pop().trim();
@@ -26,12 +29,25 @@ export default async function handler(request, response) {
       ticketToken: parts[1].trim(),
     };
   } else {
+    const digitsOnly = cleanString.replace(/\D/g, '');
+    const phoneFilter = digitsOnly.length >= 10 ? {
+      members: {
+        some: {
+          OR: [
+            { phone: { contains: digitsOnly } },
+            { normalizedPhone: digitsOnly.slice(-10) },
+          ],
+        },
+      },
+    } : null;
+
     whereClause = {
       OR: [
         { teamId: candidateUpper },
         { ticketToken: cleanString },
         { ticketId: candidateUpper },
         { orderRef: candidateUpper },
+        ...(phoneFilter ? [phoneFilter] : []),
       ],
     };
   }
@@ -39,7 +55,14 @@ export default async function handler(request, response) {
   try {
     const registration = await prisma.registration.findFirst({
       where: whereClause,
-      include: { members: { orderBy: { position: 'asc' } } },
+      include: {
+        members: { orderBy: { position: 'asc' } },
+        referral: {
+          include: {
+            referrer: { select: { id: true, name: true, code: true, email: true, type: true } },
+          },
+        },
+      },
     });
 
     if (!registration) {
@@ -49,6 +72,82 @@ export default async function handler(request, response) {
       });
     }
 
+    // -------------------------------------------------------------
+    // ACTION: LOOKUP (Read-only verification without modifying status)
+    // -------------------------------------------------------------
+    if (action === 'lookup') {
+      if (registration.revokedAt) {
+        return json(response, 200, {
+          status: 'revoked',
+          registration,
+          message: `TICKET REVOKED: ${registration.revokedReason || 'Revoked by admin'}`,
+        });
+      }
+
+      if (registration.paymentStatus !== 'PAID') {
+        return json(response, 200, {
+          status: 'unpaid',
+          registration,
+          message: `PAYMENT UNCONFIRMED: Status is ${registration.paymentStatus}`,
+        });
+      }
+
+      if (registration.checkedInAt) {
+        return json(response, 200, {
+          status: 'already',
+          registration,
+          message: `ALREADY ADMITTED at ${new Date(registration.checkedInAt).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })}`,
+        });
+      }
+
+      return json(response, 200, {
+        status: 'ready',
+        registration,
+        message: 'VALID TICKET — Ready for admission.',
+      });
+    }
+
+    // -------------------------------------------------------------
+    // ACTION: UNDO (Mark as absent / reset check-in)
+    // -------------------------------------------------------------
+    if (action === 'undo') {
+      if (!registration.checkedInAt) {
+        return json(response, 200, {
+          status: 'not_checked_in',
+          registration,
+          message: `${registration.teamName} (${registration.teamId || 'Team'}) is not currently marked as admitted.`,
+        });
+      }
+
+      const updated = await prisma.registration.update({
+        where: { id: registration.id },
+        data: { checkedInAt: null },
+        include: {
+          members: { orderBy: { position: 'asc' } },
+        },
+      });
+
+      await logAdminAction({
+        adminEmail: session.email,
+        action: 'checkin_undo',
+        targetId: registration.id,
+        details: {
+          teamId: registration.teamId || registration.ticketId,
+          teamName: registration.teamName,
+          previousCheckedInAt: registration.checkedInAt,
+        },
+      });
+
+      return json(response, 200, {
+        status: 'undone',
+        registration: updated,
+        message: `Admission undone for ${registration.teamName}. Marked as absent.`,
+      });
+    }
+
+    // -------------------------------------------------------------
+    // ACTION: CHECKIN (Default: Admit team)
+    // -------------------------------------------------------------
     if (registration.revokedAt) {
       return json(response, 200, {
         status: 'invalid',
@@ -104,7 +203,7 @@ export default async function handler(request, response) {
     return json(response, 200, {
       status: 'valid',
       registration: { ...registration, checkedInAt: now },
-      message: 'VALID ENTRY — Welcome to Hack-O-Lantern!',
+      message: `VALID ENTRY — Welcome ${registration.teamName} to Hack-O-Lantern!`,
     });
   } catch (error) {
     console.error('Check-in error', error);

@@ -54,7 +54,7 @@ export default async function handler(request, response) {
   };
 
   try {
-    const [registrations, grouped, totalCheckedIn, confirmedEmailNotSent, paidRows] = await Promise.all([
+    const [registrations, grouped, totalCheckedIn, confirmedEmailNotSent, paidRows, reminderLogs] = await Promise.all([
       prisma.registration.findMany({
         where,
         take: 300,
@@ -77,6 +77,13 @@ export default async function handler(request, response) {
         where: { paymentStatus: 'PAID' },
         select: { amount: true, discountAmount: true, couponCode: true },
       }),
+      prisma.auditLog.findMany({
+        where: {
+          action: { in: ['reminder_sent', 'reminder_unmarked'] },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { targetId: true, action: true, createdAt: true },
+      }),
     ]);
 
     const totals = Object.fromEntries(grouped.map((row) => [row.paymentStatus, row._count._all]));
@@ -85,6 +92,22 @@ export default async function handler(request, response) {
     const confirmedRevenue = paidRows.reduce((sum, r) => sum + (r.amount || 0), 0);
     const discountsGiven = paidRows.reduce((sum, r) => sum + (r.discountAmount || 0), 0);
     const couponTeamsCount = paidRows.filter((r) => Boolean(r.couponCode)).length;
+
+    // Build latest reminder status map per targetId
+    const reminderMap = new Map();
+    for (const log of reminderLogs) {
+      if (log.targetId && !reminderMap.has(log.targetId)) {
+        reminderMap.set(log.targetId, {
+          sent: log.action === 'reminder_sent',
+          sentAt: log.createdAt,
+        });
+      }
+    }
+
+    let reminderSentCount = 0;
+    for (const [, info] of reminderMap.entries()) {
+      if (info.sent) reminderSentCount++;
+    }
 
     // Detect duplicate UTRs across loaded registrations
     const utrCounts = {};
@@ -101,6 +124,10 @@ export default async function handler(request, response) {
         if (r.screenshotPath) {
           screenshotSignedUrl = await createSignedScreenshotUrl(r.screenshotPath);
         }
+
+        const reminderInfo = reminderMap.get(r.id);
+        const reminderSent = Boolean(reminderInfo?.sent);
+        const reminderSentAt = reminderInfo?.sentAt || null;
 
         return {
           id: r.id,
@@ -128,6 +155,8 @@ export default async function handler(request, response) {
           emailSentAt: r.emailSentAt,
           ticketEmailSentAt: r.ticketEmailSentAt,
           ticketEmailError: r.ticketEmailError,
+          reminderSent,
+          reminderSentAt,
           isComp: r.isComp,
           compReason: r.compReason,
           checkedInAt: r.checkedInAt,
@@ -161,6 +190,8 @@ export default async function handler(request, response) {
         revenue: confirmedRevenue,
         discountsGiven,
         couponTeamsCount,
+        reminderSentCount,
+        reminderPendingCount: Math.max(0, paidCount - reminderSentCount),
       },
     });
   } catch (error) {

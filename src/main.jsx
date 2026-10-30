@@ -11,7 +11,7 @@ const statusLabels = {
   EXPIRED: 'Expired',
 };
 
-const PUBLIC_SITE_URL = import.meta.env.VITE_PUBLIC_SITE_URL || 'https://vulcan-club.vercel.app';
+const PUBLIC_SITE_URL = import.meta.env.VITE_PUBLIC_SITE_URL || 'https://www.vulcanclub.in';
 
 function formatDate(value) {
   if (!value) return '—';
@@ -42,6 +42,64 @@ function Logo() {
 }
 
 // -------------------------------------------------------------
+// -------------------------------------------------------------
+// Helper to build standardized Event Reminder & Rules Email
+// -------------------------------------------------------------
+function buildReminderEmail(registration) {
+  const leader = registration?.members?.find((m) => m.position === 1) || registration?.members?.[0] || {};
+  const recipient = leader.email || '';
+  const teamId = registration?.teamId || registration?.orderRef || 'VHK-TEAM';
+  const teamName = registration?.teamName || 'Your Team';
+  const ticketId = registration?.ticketId || teamId;
+  const ticketLookupUrl = 'https://www.vulcanclub.in/halloween-hack';
+
+  const membersListText = (registration?.members || [])
+    .map((m, idx) => `  ${idx + 1}. ${m.fullName} (${m.college || 'Participant'})`)
+    .join('\n');
+
+  const subject = `HACK-O-LANTERN — PARTICIPANT RULES & TIMINGS · Team ${teamId} (${teamName})`;
+  const body = `Hi ${leader.fullName || 'Team Leader'},
+
+*HACK-O-LANTERN — PARTICIPANT RULES & TIMINGS*
+
+Please read and follow the following rules carefully:
+
+*1. Stay Within the Mirai Floor*
+Participants are required to remain within the designated *Mirai floor/event area* throughout the hackathon. Leaving the designated floor will not be permitted.
+
+*2. Entry Only With Valid Tickets*
+Entry will be permitted *only with a valid event ticket*. Each team must ensure that all members have their tickets ready for verification.
+
+Your Team Credentials:
+• Team ID: ${teamId}
+• Team Name: ${teamName}
+• Official Ticket ID: ${ticketId}
+${membersListText ? `• Registered Members:\n${membersListText}\n` : ''}
+Tickets can be downloaded from:
+*https://www.vulcanclub.in/halloween-hack*
+(On the page, click "Already registered? Check status", enter your Team ID ${teamId} and this email address ${recipient}, and download your ticket pass).
+
+*3. Event Timings*
+*Entry:* 31st October, *7:00 PM*
+*Event Ends:* 1st November, *11:00 AM*
+
+*4. Contact*
+For any queries or assistance, contact:
+*9907004089*
+*+91 70133 26831*
+
+Please arrive on time and keep your ticket ready at the entry checkpoint.
+
+*Strict adherence to these rules is mandatory for all participants.*
+
+Best regards,
+Vulcan Club Organizing Team
+https://www.vulcanclub.in/halloween-hack`;
+
+  return { recipient, subject, body, ticketLookupUrl, teamId, teamName, ticketId, leader };
+}
+
+// -------------------------------------------------------------
 // Manual Email Modal Component (Section 5)
 // -------------------------------------------------------------
 function ManualEmailModal({ registration, initialType = 'confirmed', onClose, onActionComplete }) {
@@ -64,7 +122,11 @@ function ManualEmailModal({ registration, initialType = 'confirmed', onClose, on
   let subject = '';
   let body = '';
 
-  if (templateType === 'confirmed') {
+  if (templateType === 'reminder_event') {
+    const reminderData = buildReminderEmail(registration);
+    subject = reminderData.subject;
+    body = reminderData.body;
+  } else if (templateType === 'confirmed') {
     subject = `Hack-O-Lantern Ticket Confirmed · Team ${teamId}`;
     body = `Hi ${leader.fullName || 'Team Leader'},
 
@@ -89,6 +151,7 @@ Your team's referral codes are on your status page.
 
 Best regards,
 Vulcan Club Organizing Team
+Official Site: https://www.vulcanclub.in/halloween-hack
 Sender: nexcell_rathinam@msot.org`;
   } else if (templateType === 'rejected') {
     subject = `Action Required: Hack-O-Lantern Payment Update · Team ${teamId}`;
@@ -109,6 +172,7 @@ If you have already transferred the ₹${registration.amount || 300}, please upl
 
 Best regards,
 Vulcan Club Organizing Team
+Official Site: https://www.vulcanclub.in/halloween-hack
 Sender: nexcell_rathinam@msot.org`;
   } else {
     subject = `Reminder: Complete your Hack-O-Lantern Registration · Team ${teamId}`;
@@ -125,6 +189,7 @@ Payment Reference: ${paymentRef}
 
 Best regards,
 Vulcan Club Organizing Team
+Official Site: https://www.vulcanclub.in/halloween-hack
 Sender: nexcell_rathinam@msot.org`;
   }
 
@@ -143,11 +208,19 @@ Sender: nexcell_rathinam@msot.org`;
     setBusy(true);
     setError('');
     try {
-      await api('mark-email-sent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ registrationId: registration.id }),
-      });
+      if (templateType === 'reminder_event') {
+        await api('mark-reminder-sent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ registrationId: registration.id, status: 'sent' }),
+        });
+      } else {
+        await api('mark-email-sent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ registrationId: registration.id }),
+        });
+      }
       setMarkedSent(true);
       onActionComplete();
     } catch (err) {
@@ -173,6 +246,13 @@ Sender: nexcell_rathinam@msot.org`;
         <div className="email-template-tabs">
           <button
             type="button"
+            className={`email-tab-btn ${templateType === 'reminder_event' ? 'is-active' : ''}`}
+            onClick={() => setTemplateType('reminder_event')}
+          >
+            📢 Reminder & Rules
+          </button>
+          <button
+            type="button"
             className={`email-tab-btn ${templateType === 'confirmed' ? 'is-active' : ''}`}
             onClick={() => setTemplateType('confirmed')}
           >
@@ -190,7 +270,7 @@ Sender: nexcell_rathinam@msot.org`;
             className={`email-tab-btn ${templateType === 'reminder' ? 'is-active' : ''}`}
             onClick={() => setTemplateType('reminder')}
           >
-            General Reminder
+            Payment Reminder
           </button>
         </div>
 
@@ -383,10 +463,12 @@ function Dashboard({ stats, referralSummary, onNavigate }) {
         <span className="stat-card__sub">Confirmed, email not sent →</span>
       </article>
 
-      <article className="stat-card" onClick={() => onNavigate('checkin')} style={{ cursor: 'pointer' }}>
-        <span className="stat-card__label">Door check-in</span>
-        <strong className="stat-card__value">{stats.checkedIn || 0}</strong>
-        <span className="stat-card__sub">Admitted at gate →</span>
+      <article className="stat-card stat-card--accent" onClick={() => onNavigate('admitted')} style={{ cursor: 'pointer' }}>
+        <span className="stat-card__label">Gate Attendance / Admitted</span>
+        <strong className="stat-card__value" style={{ color: stats.checkedIn > 0 ? '#c6f24e' : '#fff' }}>
+          {stats.checkedIn || 0}
+        </strong>
+        <span className="stat-card__sub">View admitted list ({stats.checkedIn || 0}/{stats.PAID || 0} teams) →</span>
       </article>
 
       <article className="stat-card">
@@ -1239,36 +1321,56 @@ function TicketsList({ registrations, onActionComplete, onOpenEmail }) {
 }
 
 // -------------------------------------------------------------
-// Door Check-in Component (html5-qrcode integration)
+// Door Check-in Component (html5-qrcode integration + attendance)
 // -------------------------------------------------------------
-function TicketScan({ onCheckedIn }) {
+function TicketScan({ onCheckedIn, onNavigate }) {
   const [ticketId, setTicketId] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [scannerActive, setScannerActive] = useState(false);
+  const [autoAdmit, setAutoAdmit] = useState(false);
+  const [busyAction, setBusyAction] = useState(false);
+  const [recentScans, setRecentScans] = useState([]);
   const scannerRef = useRef(null);
 
-  const checkIn = async (candidate) => {
+  const performAction = useCallback(async (candidate, action = 'checkin') => {
     const clean = String(candidate || ticketId).trim();
     if (!clean) {
-      setError('Enter or scan a ticket ID.');
+      setError('Enter or scan a ticket ID, Team ID, or leader phone.');
       return;
     }
     setError('');
-    setResult(null);
+    setBusyAction(true);
     try {
       const nextResult = await api('checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticketId: clean }),
+        body: JSON.stringify({ ticketId: clean, action }),
       });
       setTicketId(clean);
       setResult(nextResult);
-      onCheckedIn();
+
+      if (action === 'checkin' && nextResult.status === 'valid') {
+        if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+        if (nextResult.registration) {
+          setRecentScans((prev) => [
+            { ...nextResult.registration, admittedAt: new Date() },
+            ...prev.filter((r) => r.id !== nextResult.registration.id),
+          ].slice(0, 5));
+        }
+        onCheckedIn();
+      } else if (action === 'undo' && nextResult.status === 'undone') {
+        if (nextResult.registration) {
+          setRecentScans((prev) => prev.filter((r) => r.id !== nextResult.registration.id));
+        }
+        onCheckedIn();
+      }
     } catch (nextError) {
-      setError(nextError.message);
+      setError(nextError.message || 'Could not process request.');
+    } finally {
+      setBusyAction(false);
     }
-  };
+  }, [ticketId, onCheckedIn]);
 
   useEffect(() => {
     if (!scannerActive) {
@@ -1281,16 +1383,21 @@ function TicketScan({ onCheckedIn }) {
 
     const html5QrcodeScanner = new Html5QrcodeScanner(
       'qr-reader',
-      { fps: 10, qrbox: { width: 250, height: 250 } },
+      {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0,
+        showTorchButtonIfSupported: true,
+      },
       false
     );
     scannerRef.current = html5QrcodeScanner;
 
     html5QrcodeScanner.render(
       (decodedText) => {
-        checkIn(decodedText);
         html5QrcodeScanner.clear().catch(console.warn);
         setScannerActive(false);
+        performAction(decodedText, autoAdmit ? 'checkin' : 'lookup');
       },
       () => {}
     );
@@ -1298,88 +1405,927 @@ function TicketScan({ onCheckedIn }) {
     return () => {
       html5QrcodeScanner.clear().catch(console.warn);
     };
-  }, [scannerActive]);
+  }, [scannerActive, autoAdmit, performAction]);
+
+  const handleScanNext = () => {
+    setResult(null);
+    setError('');
+    setTicketId('');
+    setScannerActive(true);
+  };
 
   return (
     <section className="checkin">
       <div className="section-head">
         <div>
           <h2>Door Check-in Desk</h2>
-          <p>Scan attendee QR pass or enter their Team ID / Ticket Token.</p>
+          <p>Scan attendee QR pass or enter Team ID, Ticket Token, or Leader Phone.</p>
+        </div>
+        {onNavigate && (
+          <button
+            type="button"
+            className="quiet"
+            onClick={() => onNavigate('admitted')}
+            style={{ fontSize: '12px' }}
+          >
+            View Admitted Teams →
+          </button>
+        )}
+      </div>
+
+      {/* Checkin Mode Controls */}
+      <div className="checkin-controls">
+        <div className="checkin-mode-toggle">
+          <label className="toggle-switch" style={{ cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={autoAdmit}
+              onChange={(e) => setAutoAdmit(e.target.checked)}
+            />
+            <span className="toggle-slider" />
+          </label>
+          <div>
+            <strong>Instant Auto-Admit on Scan</strong>
+            <small>
+              {autoAdmit
+                ? 'ON: Scans will immediately admit attendees.'
+                : 'OFF: Scans will display team details first for verification.'}
+            </small>
+          </div>
         </div>
       </div>
 
       <div className="checkin__body">
         <div className="scan-box">
           {scannerActive ? (
-            <div id="qr-reader" style={{ width: '100%', maxWidth: '400px' }} />
+            <div className="scan-camera-container">
+              <div id="qr-reader" />
+              <button
+                type="button"
+                className="quiet"
+                onClick={() => setScannerActive(false)}
+                style={{ marginTop: '8px' }}
+              >
+                Close camera
+              </button>
+            </div>
           ) : (
             <div className="scan-box__idle">
               <span className="scan-box__icon">📷</span>
               <p>Camera ready for gate check-in</p>
-              <button onClick={() => setScannerActive(true)}>Start camera scanner</button>
+              <button
+                type="button"
+                className="btn-approve"
+                style={{ minHeight: '44px', padding: '0 20px' }}
+                onClick={() => setScannerActive(true)}
+              >
+                Start camera scanner
+              </button>
             </div>
-          )}
-          {scannerActive && (
-            <button className="quiet" onClick={() => setScannerActive(false)}>Stop camera</button>
           )}
         </div>
 
-        <form onSubmit={(e) => { e.preventDefault(); checkIn(); }}>
+        <form
+          className="checkin-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            performAction(ticketId, 'lookup');
+          }}
+        >
           <label htmlFor="ticket-id">
-            Team ID / Ticket Token / Ticket ID
-            <input
-              id="ticket-id"
-              value={ticketId}
-              onChange={(e) => setTicketId(e.target.value)}
-              placeholder="e.g. VHK-1001 or VULCAN-XXXX-XXXX"
-              autoCapitalize="characters"
-            />
+            Manual Lookup / Verify
+            <div className="checkin-input-group">
+              <input
+                id="ticket-id"
+                value={ticketId}
+                onChange={(e) => setTicketId(e.target.value)}
+                placeholder="Team ID (e.g. VHK-1001), Ticket Token, or Phone"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                disabled={busyAction}
+              />
+            </div>
           </label>
-          <button type="submit">Verify & Check in</button>
+
+          <div className="checkin-actions-row">
+            <button
+              type="button"
+              className="quiet"
+              disabled={busyAction || !ticketId.trim()}
+              onClick={() => performAction(ticketId, 'lookup')}
+              style={{ minHeight: '44px', fontWeight: 600 }}
+            >
+              {busyAction ? 'Checking…' : '🔍 Inspect Team'}
+            </button>
+            <button
+              type="button"
+              className="btn-approve"
+              disabled={busyAction || !ticketId.trim()}
+              onClick={() => performAction(ticketId, 'checkin')}
+              style={{ minHeight: '44px' }}
+            >
+              {busyAction ? 'Admitting…' : '✓ Quick Admit'}
+            </button>
+          </div>
         </form>
       </div>
 
-      {error && <p className="form-error" role="alert">{error}</p>}
-      {result && <CheckinResult result={result} />}
+      {error && <p className="form-error" role="alert" style={{ marginTop: '16px' }}>{error}</p>}
+
+      {result && (
+        <CheckinResult
+          result={result}
+          busyAction={busyAction}
+          onAdmit={(candidate) => performAction(candidate, 'checkin')}
+          onUndo={(candidate) => performAction(candidate, 'undo')}
+          onScanNext={handleScanNext}
+        />
+      )}
+
+      {/* Recent Gate Activity Feed */}
+      {recentScans.length > 0 && (
+        <div className="recent-feed">
+          <h3>Recently Admitted at this Desk</h3>
+          <div className="recent-list">
+            {recentScans.map((team) => (
+              <div key={team.id} className="recent-item">
+                <div>
+                  <strong>{team.teamName}</strong> <code>({team.teamId || team.orderRef})</code>
+                  <small style={{ display: 'block' }}>
+                    Admitted at {new Intl.DateTimeFormat('en-IN', { timeStyle: 'short', timeZone: 'Asia/Kolkata' }).format(new Date(team.admittedAt))} · {team.members?.length || 0} members
+                  </small>
+                </div>
+                <button
+                  type="button"
+                  className="table-action table-action--danger"
+                  disabled={busyAction}
+                  onClick={() => performAction(team.id, 'undo')}
+                >
+                  Undo
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
 
-function CheckinResult({ result }) {
+function CheckinResult({ result, busyAction, onAdmit, onUndo, onScanNext }) {
+  const isReady = result.status === 'ready';
   const isValid = result.status === 'valid';
   const isAlready = result.status === 'already';
+  const isUnpaid = result.status === 'unpaid';
+  const isRevoked = result.status === 'revoked';
   const isInvalid = result.status === 'invalid';
+  const isUndone = result.status === 'undone';
+
+  const reg = result.registration;
 
   return (
-    <div className={`checkin-result ${isValid ? 'valid' : isAlready ? 'already' : 'invalid'}`} role="status">
+    <div
+      className={`checkin-result ${
+        isReady
+          ? 'ready'
+          : isValid
+            ? 'valid'
+            : isAlready
+              ? 'already'
+              : 'invalid'
+      }`}
+      role="status"
+    >
       <div className="checkin-result__header">
         <strong>
-          {isValid && '✓ VALID — ENTRY RECORDED'}
-          {isAlready && '• ALREADY CHECKED IN'}
+          {isReady && '🔍 VERIFIED — READY FOR ADMISSION'}
+          {isValid && '✓ ENTRY RECORDED — WELCOME!'}
+          {isAlready && '• ALREADY ADMITTED'}
+          {isUndone && '↺ ADMISSION UNDONE (MARKED ABSENT)'}
+          {isUnpaid && '× PAYMENT UNCONFIRMED'}
+          {isRevoked && '× TICKET REVOKED'}
           {isInvalid && '× INVALID TICKET'}
         </strong>
         <span>{result.message}</span>
       </div>
 
-      {result.registration && (
+      {reg && (
         <div className="checkin-result__details">
-          <h3>{result.registration.teamName}</h3>
-          <p>
-            Team ID: <code>{result.registration.teamId || result.registration.orderRef}</code> ·
-            Ticket: <code>{result.registration.ticketId}</code>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <h3 style={{ margin: 0, fontSize: '20px' }}>{reg.teamName}</h3>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                padding: '3px 8px',
+                borderRadius: '4px',
+                background: reg.paymentStatus === 'PAID' ? 'rgba(198, 242, 78, 0.15)' : 'rgba(255, 70, 70, 0.15)',
+                color: reg.paymentStatus === 'PAID' ? '#c6f24e' : '#ff9aa0',
+              }}
+            >
+              {reg.paymentStatus} {reg.isComp ? '(COMP)' : `(₹${reg.amount})`}
+            </span>
+          </div>
+
+          <p style={{ marginTop: '8px', color: '#b4b4b4', fontSize: '13px' }}>
+            Team ID: <code>{reg.teamId || reg.orderRef}</code> ·
+            Ticket ID: <code>{reg.ticketId || '—'}</code>
+            {reg.checkedInAt && (
+              <span style={{ display: 'block', marginTop: '4px', color: '#c6f24e' }}>
+                Checked in at:{' '}
+                {new Intl.DateTimeFormat('en-IN', {
+                  timeStyle: 'medium',
+                  timeZone: 'Asia/Kolkata',
+                }).format(new Date(reg.checkedInAt))}
+              </span>
+            )}
           </p>
-          <ul className="checkin-members">
-            {result.registration.members.map((m) => (
-              <li key={m.id || m.position}>
-                <strong>{m.fullName}</strong>
-                <small>{m.college}</small>
-              </li>
-            ))}
-          </ul>
+
+          <div style={{ marginTop: '14px' }}>
+            <span style={{ fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#888', fontWeight: 600 }}>
+              Team Members ({reg.members?.length || 0})
+            </span>
+            <ul className="checkin-members">
+              {reg.members?.map((m) => (
+                <li key={m.id || m.position} style={{ padding: '6px 0', borderBottom: '1px solid #222' }}>
+                  <div>
+                    <strong>{m.position === 1 ? '👑 ' : ''}{m.fullName}</strong>
+                    <small style={{ display: 'block', color: '#888' }}>
+                      {m.college} {m.phone ? `· ${m.phone}` : ''}
+                    </small>
+                  </div>
+                  <span style={{ color: '#aaa', fontSize: '12px' }}>Pos #{m.position}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Interactive Attendance Action Buttons */}
+          <div style={{ marginTop: '20px', display: 'grid', gap: '10px' }}>
+            {(isReady || (!reg.checkedInAt && reg.paymentStatus === 'PAID')) && (
+              <button
+                type="button"
+                className="btn-admit-big"
+                disabled={busyAction}
+                onClick={() => onAdmit(reg.id)}
+              >
+                {busyAction ? 'Admitting…' : '✓ Mark as Present / Admit Team'}
+              </button>
+            )}
+
+            {reg.checkedInAt && (
+              <button
+                type="button"
+                className="btn-undo-big"
+                disabled={busyAction}
+                onClick={() => {
+                  if (window.confirm(`Undo admission for "${reg.teamName}" and mark as absent?`)) {
+                    onUndo(reg.id);
+                  }
+                }}
+              >
+                {busyAction ? 'Updating…' : '↺ Mark as Absent (Undo Admission)'}
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="btn-scan-next"
+              onClick={onScanNext}
+            >
+              📷 Scan Next Attendee
+            </button>
+          </div>
         </div>
       )}
     </div>
+  );
+}
+
+function getTodayDateString() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// -------------------------------------------------------------
+// Admitted Teams & Gate Attendance View Component
+// -------------------------------------------------------------
+function AdmittedView({ registrations, onActionComplete, onNavigate }) {
+  const [search, setSearch] = useState('');
+  const [undoBusyId, setUndoBusyId] = useState(null);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+
+  // Extract all checked-in registrations
+  const admittedList = registrations.filter((r) => Boolean(r.checkedInAt));
+  const paidCount = registrations.filter((r) => r.paymentStatus === 'PAID').length;
+  const totalAttendeesInside = admittedList.reduce((sum, r) => sum + (r.members?.length || 0), 0);
+  const percentAdmitted = paidCount > 0 ? Math.round((admittedList.length / paidCount) * 100) : 0;
+
+  // Filter admitted teams by query
+  const filtered = admittedList.filter((r) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    const teamId = (r.teamId || r.orderRef || '').toLowerCase();
+    const teamName = (r.teamName || '').toLowerCase();
+    const memberMatch = r.members?.some(
+      (m) =>
+        m.fullName.toLowerCase().includes(q) ||
+        m.college.toLowerCase().includes(q) ||
+        m.phone.includes(q) ||
+        m.email.toLowerCase().includes(q)
+    );
+    return teamId.includes(q) || teamName.includes(q) || memberMatch;
+  });
+
+  const handleUndo = async (team) => {
+    if (!window.confirm(`Mark team "${team.teamName}" (${team.teamId || team.orderRef}) as absent / undo admission?`)) {
+      return;
+    }
+    setUndoBusyId(team.id);
+    setNotice('');
+    setError('');
+    try {
+      const res = await api('checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticketId: team.id, action: 'undo' }),
+      });
+      setNotice(res.message || `Admission undone for ${team.teamName}. Marked as absent.`);
+      onActionComplete();
+    } catch (err) {
+      setError(err.message || 'Could not undo check-in.');
+    } finally {
+      setUndoBusyId(null);
+    }
+  };
+
+  const exportAdmittedCsv = () => {
+    window.open('/api/export?filter=admitted', '_blank');
+  };
+
+  const exportAdmittedExcel = () => {
+    // Generate Excel-friendly format directly in browser
+    const header = [
+      'Team ID', 'Team Name', 'Admitted At (IST)', 'Payment Status', 'Amount',
+      'Leader Name', 'Leader Phone', 'Leader Email', 'Leader College',
+      'Member 2 Name', 'Member 2 Phone', 'Member 2 College',
+      'Member 3 Name', 'Member 3 Phone', 'Member 3 College',
+      'Member 4 Name', 'Member 4 Phone', 'Member 4 College',
+    ];
+
+    const rows = admittedList.map((r) => {
+      const leader = r.members?.find((m) => m.position === 1) || r.members?.[0] || {};
+      const m2 = r.members?.find((m) => m.position === 2) || {};
+      const m3 = r.members?.find((m) => m.position === 3) || {};
+      const m4 = r.members?.find((m) => m.position === 4) || {};
+
+      const admittedTime = r.checkedInAt
+        ? new Intl.DateTimeFormat('en-IN', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+            timeZone: 'Asia/Kolkata',
+          }).format(new Date(r.checkedInAt))
+        : '';
+
+      return [
+        r.teamId || r.orderRef || '',
+        r.teamName || '',
+        admittedTime,
+        r.paymentStatus || '',
+        r.amount || 0,
+        leader.fullName || '', leader.phone || '', leader.email || '', leader.college || '',
+        m2.fullName || '', m2.phone || '', m2.college || '',
+        m3.fullName || '', m3.phone || '', m3.college || '',
+        m4.fullName || '', m4.phone || '', m4.college || '',
+      ];
+    });
+
+    const escapeCsv = (val) => `"${String(val ?? '').replaceAll('"', '""')}"`;
+    const csvContent = '\uFEFF' + [header, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `hack-o-lantern-admitted-teams-${getTodayDateString()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <section className="admitted-section">
+      <div className="section-head">
+        <div>
+          <h2>Admitted Teams & Attendance</h2>
+          <p>Live attendance roster of checked-in hackathon teams and members.</p>
+        </div>
+        <div className="section-head__actions" style={{ flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn-approve"
+            onClick={() => onNavigate('checkin')}
+            style={{ minHeight: '38px', padding: '0 16px', fontSize: '13px' }}
+          >
+            ⚡ Door Check-in
+          </button>
+          <button
+            type="button"
+            className="export"
+            onClick={exportAdmittedCsv}
+            style={{ minHeight: '38px', padding: '0 16px', fontSize: '13px' }}
+          >
+            📥 Export CSV
+          </button>
+          <button
+            type="button"
+            className="quiet"
+            onClick={exportAdmittedExcel}
+            style={{ minHeight: '38px', padding: '0 16px', fontSize: '13px' }}
+          >
+            📊 Export for Excel
+          </button>
+        </div>
+      </div>
+
+      {notice && <p className="form-notice" style={{ marginTop: '14px' }}>{notice}</p>}
+      {error && <p className="form-error" style={{ marginTop: '14px' }}>{error}</p>}
+
+      {/* Attendance Stats Cards */}
+      <div className="admitted-stats-grid">
+        <div className="admitted-stat-box">
+          <span className="admitted-stat-box__label">Admitted Teams</span>
+          <strong className="admitted-stat-box__value admitted-stat-box__value--green">
+            {admittedList.length} <small style={{ fontSize: '16px', color: '#888' }}>/ {paidCount}</small>
+          </strong>
+          <span className="admitted-stat-box__sub">{percentAdmitted}% of confirmed teams admitted</span>
+        </div>
+
+        <div className="admitted-stat-box">
+          <span className="admitted-stat-box__label">Total Attendees Inside</span>
+          <strong className="admitted-stat-box__value">{totalAttendeesInside}</strong>
+          <span className="admitted-stat-box__sub">Physical participants inside venue</span>
+        </div>
+
+        <div className="admitted-stat-box">
+          <span className="admitted-stat-box__label">Pending Gate Admission</span>
+          <strong className="admitted-stat-box__value" style={{ color: paidCount - admittedList.length > 0 ? '#ff9a4d' : '#888' }}>
+            {Math.max(0, paidCount - admittedList.length)}
+          </strong>
+          <span className="admitted-stat-box__sub">Confirmed teams yet to arrive</span>
+        </div>
+      </div>
+
+      {/* Search Input */}
+      <div className="table-tools">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search admitted teams, members, colleges, phones…"
+          style={{ width: '100%', maxWidth: '420px', minHeight: '40px' }}
+        />
+        {search && (
+          <button
+            type="button"
+            className="quiet"
+            onClick={() => setSearch('')}
+            style={{ minHeight: '40px', padding: '0 14px', fontSize: '12px' }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Admitted List */}
+      {admittedList.length === 0 ? (
+        <div className="empty" style={{ textAlign: 'center', padding: '40px 20px', background: '#141414', borderRadius: '8px' }}>
+          <span style={{ fontSize: '36px', display: 'block', marginBottom: '12px' }}>🚪</span>
+          <h3 style={{ margin: '0 0 6px', color: '#fff' }}>No Teams Admitted Yet</h3>
+          <p style={{ color: '#888', maxWidth: '400px', margin: '0 auto 20px' }}>
+            Door check-in desk will populate this attendance roster as teams arrive and scan their tickets.
+          </p>
+          <button
+            type="button"
+            className="btn-approve"
+            onClick={() => onNavigate('checkin')}
+            style={{ minHeight: '44px', padding: '0 24px' }}
+          >
+            Open Door Check-in Desk →
+          </button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <p className="empty">No admitted teams match &quot;{search}&quot;.</p>
+      ) : (
+        <div className="admitted-cards-list">
+          {filtered.map((team) => {
+            const leader = team.members?.find((m) => m.position === 1) || team.members?.[0] || {};
+            const admittedTimeStr = team.checkedInAt
+              ? new Intl.DateTimeFormat('en-IN', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                  timeZone: 'Asia/Kolkata',
+                }).format(new Date(team.checkedInAt))
+              : '—';
+
+            return (
+              <div key={team.id} className="admitted-card">
+                <div className="admitted-card__header">
+                  <div className="admitted-card__title">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <code className="code--green" style={{ fontSize: '14px' }}>
+                        {team.teamId || team.orderRef}
+                      </code>
+                      <h3>{team.teamName}</h3>
+                      {team.isComp && <span className="comp-tag">COMP</span>}
+                    </div>
+                  </div>
+                  <span className="admitted-card__time">
+                    ✓ Admitted at {admittedTimeStr}
+                  </span>
+                </div>
+
+                {/* Team Members Grid */}
+                <div className="admitted-members-grid">
+                  {team.members?.map((m) => (
+                    <div key={m.id || m.position} className="admitted-member-item">
+                      <strong>{m.position === 1 ? '👑 ' : ''}{m.fullName}</strong>
+                      <span>{m.college}</span>
+                      {m.phone && <a href={`tel:${m.phone}`}>📞 {m.phone}</a>}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="admitted-card__footer">
+                  <small style={{ color: '#888', fontSize: '12px' }}>
+                    Leader: {leader.fullName || '—'} · {leader.email ? <a href={`mailto:${leader.email}`} style={{ color: '#38bdf8' }}>{leader.email}</a> : '—'}
+                  </small>
+                  <button
+                    type="button"
+                    className="table-action table-action--danger"
+                    disabled={undoBusyId === team.id}
+                    onClick={() => handleUndo(team)}
+                    style={{ minHeight: '34px', padding: '0 14px' }}
+                  >
+                    {undoBusyId === team.id ? 'Updating…' : '↺ Undo Admission'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// -------------------------------------------------------------
+// Reminders & Rules Broadcast View Component
+// -------------------------------------------------------------
+function RemindersView({ registrations, onActionComplete, onOpenEmail }) {
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all'); // 'all' | 'pending' | 'sent'
+  const [copiedBcc, setCopiedBcc] = useState(false);
+  const [copiedId, setCopiedId] = useState('');
+  const [busyId, setBusyId] = useState(null);
+  const [notice, setNotice] = useState('');
+
+  // Only confirmed (PAID) teams get the final event reminder & rules
+  const paidTeams = registrations.filter((r) => r.paymentStatus === 'PAID');
+  const sentTeams = paidTeams.filter((r) => Boolean(r.reminderSent));
+  const pendingTeams = paidTeams.filter((r) => !r.reminderSent);
+
+  const filtered = paidTeams.filter((r) => {
+    if (filter === 'sent' && !r.reminderSent) return false;
+    if (filter === 'pending' && r.reminderSent) return false;
+
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    const teamId = (r.teamId || r.orderRef || '').toLowerCase();
+    const teamName = (r.teamName || '').toLowerCase();
+    const leader = r.members?.find((m) => m.position === 1) || r.members?.[0] || {};
+    const leaderName = (leader.fullName || '').toLowerCase();
+    const leaderEmail = (leader.email || '').toLowerCase();
+    const leaderPhone = (leader.phone || '').toLowerCase();
+
+    return (
+      teamId.includes(q) ||
+      teamName.includes(q) ||
+      leaderName.includes(q) ||
+      leaderEmail.includes(q) ||
+      leaderPhone.includes(q)
+    );
+  });
+
+  const allLeaderEmails = Array.from(
+    new Set(
+      paidTeams
+        .map((r) => {
+          const leader = r.members?.find((m) => m.position === 1) || r.members?.[0];
+          return leader?.email;
+        })
+        .filter(Boolean)
+    )
+  );
+
+  const handleCopyBcc = () => {
+    navigator.clipboard?.writeText(allLeaderEmails.join(', ')).then(() => {
+      setCopiedBcc(true);
+      setTimeout(() => setCopiedBcc(false), 2500);
+    });
+  };
+
+  const handleResetAll = async () => {
+    if (!window.confirm('Reset reminder status for all teams back to Pending?')) return;
+    try {
+      await api('mark-reminder-sent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset_all' }),
+      });
+      setNotice('All teams have been reset to pending reminder.');
+      onActionComplete();
+    } catch (err) {
+      alert(err.message || 'Could not reset reminders');
+    }
+  };
+
+  const handleToggleSent = async (team) => {
+    setBusyId(team.id);
+    const nextStatus = team.reminderSent ? 'pending' : 'sent';
+    try {
+      await api('mark-reminder-sent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registrationId: team.id, status: nextStatus }),
+      });
+      setNotice(`Updated reminder status for ${team.teamName} to "${nextStatus}".`);
+      onActionComplete();
+    } catch (err) {
+      alert(err.message || 'Could not update status');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleCopySingle = (team) => {
+    const { subject, body } = buildReminderEmail(team);
+    navigator.clipboard?.writeText(`Subject: ${subject}\n\n${body}`).then(() => {
+      setCopiedId(team.id);
+      setTimeout(() => setCopiedId(''), 2000);
+    });
+  };
+
+  // Master email template preview for mass broadcast
+  const masterSubject = 'HACK-O-LANTERN — PARTICIPANT RULES & TIMINGS';
+  const masterGmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&bcc=${encodeURIComponent(allLeaderEmails.join(','))}&su=${encodeURIComponent(masterSubject)}&body=${encodeURIComponent(
+`*HACK-O-LANTERN — PARTICIPANT RULES & TIMINGS*
+
+Please read and follow the following rules carefully:
+
+*1. Stay Within the Mirai Floor*
+Participants are required to remain within the designated *Mirai floor/event area* throughout the hackathon. Leaving the designated floor will not be permitted.
+
+*2. Entry Only With Valid Tickets*
+Entry will be permitted *only with a valid event ticket*. Each team must ensure that all members have their tickets ready for verification.
+
+Tickets can be downloaded from:
+*https://www.vulcanclub.in/halloween-hack*
+(Click "Already registered? Check status", enter your Team ID and email to view/download your ticket pass).
+
+*3. Event Timings*
+*Entry:* 31st October, *7:00 PM*
+*Event Ends:* 1st November, *11:00 AM*
+
+*4. Contact*
+For any queries or assistance, contact:
+*9907004089*
+*+91 70133 26831*
+
+Please arrive on time and keep your ticket ready at the entry checkpoint.
+
+*Strict adherence to these rules is mandatory for all participants.*
+
+Best regards,
+Vulcan Club Organizing Team
+https://www.vulcanclub.in/halloween-hack`
+  )}`;
+
+  return (
+    <section className="reminders-section">
+      <div className="section-head">
+        <div>
+          <h2>Event Reminders & Rules Dispatch</h2>
+          <p>
+            Send the official event reminder, rules, what-to-bring checklist, and ticket URL (<code>https://www.vulcanclub.in/halloween-hack</code>) to confirmed teams.
+          </p>
+        </div>
+        <div className="section-head__actions" style={{ flexWrap: 'wrap' }}>
+          {sentTeams.length > 0 && (
+            <button
+              type="button"
+              className="quiet"
+              onClick={handleResetAll}
+              style={{ minHeight: '38px', padding: '0 14px', fontSize: '13px', color: '#ff9a4d' }}
+            >
+              ↺ Reset All to Pending
+            </button>
+          )}
+          <button
+            type="button"
+            className="quiet"
+            onClick={handleCopyBcc}
+            style={{ minHeight: '38px', padding: '0 16px', fontSize: '13px' }}
+          >
+            {copiedBcc ? '✓ Copied All Emails (BCC)!' : `📋 Copy All Emails (${allLeaderEmails.length} BCC)`}
+          </button>
+          <a
+            className="btn-gmail"
+            href={masterGmailUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              borderRadius: '999px',
+              padding: '0 16px',
+              minHeight: '38px',
+              fontSize: '13px',
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            ✉️ Open Mass BCC in Gmail ↗
+          </a>
+        </div>
+      </div>
+
+      {notice && <p className="form-notice" style={{ marginTop: '14px' }}>{notice}</p>}
+
+      {/* Stats Grid */}
+      <div className="reminders-stats-grid">
+        <div className="admitted-stat-box">
+          <span className="admitted-stat-box__label">Confirmed Teams</span>
+          <strong className="admitted-stat-box__value">{paidTeams.length}</strong>
+          <span className="admitted-stat-box__sub">Eligible for final event reminder</span>
+        </div>
+        <div className="admitted-stat-box">
+          <span className="admitted-stat-box__label">Reminders Dispatched</span>
+          <strong className="admitted-stat-box__value admitted-stat-box__value--green">{sentTeams.length}</strong>
+          <span className="admitted-stat-box__sub">Marked as sent</span>
+        </div>
+        <div className="admitted-stat-box">
+          <span className="admitted-stat-box__label">Pending Reminder</span>
+          <strong className="admitted-stat-box__value" style={{ color: pendingTeams.length > 0 ? '#ff9a4d' : '#888' }}>
+            {pendingTeams.length}
+          </strong>
+          <span className="admitted-stat-box__sub">Teams awaiting reminder</span>
+        </div>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="filter-chips">
+        <button
+          type="button"
+          className={`chip-btn ${filter === 'all' ? 'is-active' : ''}`}
+          onClick={() => setFilter('all')}
+        >
+          All Confirmed ({paidTeams.length})
+        </button>
+        <button
+          type="button"
+          className={`chip-btn ${filter === 'pending' ? 'is-active' : ''}`}
+          onClick={() => setFilter('pending')}
+        >
+          ⏳ Pending Reminder ({pendingTeams.length})
+        </button>
+        <button
+          type="button"
+          className={`chip-btn ${filter === 'sent' ? 'is-active' : ''}`}
+          onClick={() => setFilter('sent')}
+        >
+          ✓ Sent ({sentTeams.length})
+        </button>
+      </div>
+
+      <div className="table-tools">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search confirmed teams, leader name, email, or phone…"
+          style={{ width: '100%', maxWidth: '420px', minHeight: '40px' }}
+        />
+        {search && (
+          <button
+            type="button"
+            className="quiet"
+            onClick={() => setSearch('')}
+            style={{ minHeight: '40px', padding: '0 14px', fontSize: '12px' }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {/* Cards List */}
+      {filtered.length === 0 ? (
+        <p className="empty">No confirmed teams match the selected filter.</p>
+      ) : (
+        <div className="reminders-cards-list">
+          {filtered.map((team) => {
+            const { subject, body, recipient, teamId, teamName, ticketId } = buildReminderEmail(team);
+            const leader = team.members?.find((m) => m.position === 1) || team.members?.[0] || {};
+            const isSent = Boolean(team.reminderSent);
+            const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipient)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+            return (
+              <div key={team.id} className={`reminder-card ${isSent ? 'reminder-card--sent' : 'reminder-card--pending'}`}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <code className="code--green" style={{ fontSize: '14px' }}>{teamId}</code>
+                      <h3 style={{ margin: 0, fontSize: '18px', color: '#fff' }}>{teamName}</h3>
+                      {team.isComp && <span className="comp-tag">COMP</span>}
+                    </div>
+                    <small style={{ display: 'block', color: '#aaa', marginTop: '4px' }}>
+                      Official Ticket: <code>{ticketId}</code> · Leader: <strong>{leader.fullName || '—'}</strong> ({leader.college || '—'})
+                    </small>
+                  </div>
+
+                  <span
+                    style={{
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      padding: '3px 10px',
+                      borderRadius: '999px',
+                      background: isSent ? 'rgba(198, 242, 78, 0.15)' : 'rgba(255, 154, 77, 0.15)',
+                      color: isSent ? '#c6f24e' : '#ff9a4d',
+                      border: `1px solid ${isSent ? 'rgba(198, 242, 78, 0.3)' : 'rgba(255, 154, 77, 0.3)'}`,
+                    }}
+                  >
+                    {isSent ? '✓ Reminder Sent' : '⏳ Pending Reminder'}
+                  </span>
+                </div>
+
+                <div style={{ background: '#0d0d0d', padding: '10px 14px', borderRadius: '6px', fontSize: '12.5px', border: '1px solid #1c1c1c' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                    <span>Email: <strong>{recipient || '—'}</strong></span>
+                    {leader.phone && <span>Phone: <a href={`tel:${leader.phone}`} style={{ color: '#38bdf8', textDecoration: 'none' }}>{leader.phone}</a></span>}
+                    <span>Members: <strong>{team.members?.length || 0}</strong></span>
+                  </div>
+                </div>
+
+                <div className="reminder-actions">
+                  <a
+                    className="btn-gmail"
+                    href={gmailUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      borderRadius: '999px',
+                      padding: '0 16px',
+                      minHeight: '34px',
+                      fontSize: '12.5px',
+                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                    }}
+                  >
+                    ✉️ Open in Gmail ↗
+                  </a>
+                  <button
+                    type="button"
+                    className="quiet"
+                    onClick={() => handleCopySingle(team)}
+                    style={{ minHeight: '34px', padding: '0 12px', fontSize: '12px' }}
+                  >
+                    {copiedId === team.id ? '✓ Message Copied!' : '📋 Copy Message'}
+                  </button>
+                  <button
+                    type="button"
+                    className="quiet"
+                    onClick={() => onOpenEmail(team, 'reminder_event')}
+                    style={{ minHeight: '34px', padding: '0 12px', fontSize: '12px' }}
+                  >
+                    👁 Preview / Edit
+                  </button>
+                  <button
+                    type="button"
+                    className={`table-action ${isSent ? '' : 'btn-approve'}`}
+                    disabled={busyId === team.id}
+                    onClick={() => handleToggleSent(team)}
+                    style={{ minHeight: '34px', padding: '0 14px', fontSize: '12px', marginLeft: 'auto' }}
+                  >
+                    {busyId === team.id ? 'Saving…' : isSent ? '↺ Mark Pending' : '✓ Mark Sent'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -3432,6 +4378,7 @@ export default function App() {
   const [authenticated, setAuthenticated] = useState(null);
   const [adminUser, setAdminUser] = useState(null);
   const [tab, setTab] = useState('dashboard');
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [registrations, setRegistrations] = useState([]);
   const [stats, setStats] = useState({});
   const [totals, setTotals] = useState({});
@@ -3482,7 +4429,7 @@ export default function App() {
   useEffect(() => {
     const handleHash = () => {
       const h = window.location.hash.replace('#', '');
-      if (['dashboard', 'payments', 'tickets', 'checkin', 'teams', 'coupons', 'referrals', 'settings'].includes(h)) {
+      if (['dashboard', 'payments', 'tickets', 'checkin', 'admitted', 'reminders', 'teams', 'coupons', 'referrals', 'settings'].includes(h)) {
         setTab(h);
       }
     };
@@ -3493,6 +4440,7 @@ export default function App() {
 
   const changeTab = (nextTab, nextStatus = '') => {
     setTab(nextTab);
+    setMobileDrawerOpen(false);
     window.location.hash = nextTab;
     if (nextStatus !== undefined) setStatus(nextStatus);
   };
@@ -3513,8 +4461,31 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <aside>
-        <Logo />
+      {/* Mobile Drawer Backdrop */}
+      {mobileDrawerOpen && (
+        <div
+          className="drawer-backdrop"
+          onClick={() => setMobileDrawerOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Main Sidebar (Desktop fixed, Mobile slide-over drawer) */}
+      <aside className={mobileDrawerOpen ? 'mobile-drawer-open' : ''}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Logo />
+          {mobileDrawerOpen && (
+            <button
+              type="button"
+              className="quiet"
+              onClick={() => setMobileDrawerOpen(false)}
+              style={{ minHeight: '32px', padding: '0 10px', fontSize: '13px' }}
+            >
+              ✕ Close
+            </button>
+          )}
+        </div>
+
         <nav aria-label="Operations navigation">
           <a
             href="#dashboard"
@@ -3522,6 +4493,28 @@ export default function App() {
             onClick={() => changeTab('dashboard')}
           >
             Dashboard
+          </a>
+          <a
+            href="#checkin"
+            className={tab === 'checkin' ? 'is-active' : ''}
+            onClick={() => changeTab('checkin')}
+            style={{ fontWeight: tab === 'checkin' ? 700 : 500 }}
+          >
+            📷 Door check-in
+          </a>
+          <a
+            href="#admitted"
+            className={tab === 'admitted' ? 'is-active' : ''}
+            onClick={() => changeTab('admitted')}
+          >
+            ✓ Admitted roster <span>{stats.checkedIn || 0}</span>
+          </a>
+          <a
+            href="#reminders"
+            className={tab === 'reminders' ? 'is-active' : ''}
+            onClick={() => changeTab('reminders')}
+          >
+            📢 Reminders & Rules <span>{totals.PAID || 0}</span>
           </a>
           <a
             href="#payments"
@@ -3536,13 +4529,6 @@ export default function App() {
             onClick={() => changeTab('tickets')}
           >
             Tickets <span>{totals.PAID || 0}</span>
-          </a>
-          <a
-            href="#checkin"
-            className={tab === 'checkin' ? 'is-active' : ''}
-            onClick={() => changeTab('checkin')}
-          >
-            Door check-in
           </a>
           <a
             href="#teams"
@@ -3580,9 +4566,28 @@ export default function App() {
         </div>
       </aside>
 
+      {/* Sticky Header with Mobile Menu Button & Live Gate Pill */}
       <header>
-        <span>Hack-O-Lantern · 31 Oct 2026</span>
-        <strong>Mirai Floor, Bengaluru</strong>
+        <div className="header-left">
+          <button
+            type="button"
+            className="mobile-menu-btn"
+            onClick={() => setMobileDrawerOpen(!mobileDrawerOpen)}
+            aria-label="Open navigation menu"
+          >
+            ☰
+          </button>
+          <span style={{ fontWeight: 600, color: '#fff' }}>Hack-O-Lantern</span>
+        </div>
+        <div className="header-right">
+          <span
+            className="live-gate-pill"
+            onClick={() => changeTab('admitted')}
+            title="Click to view gate admitted teams"
+          >
+            <span className="live-dot" /> Admitted: <b>{stats.checkedIn || 0}</b> / {totals.PAID || 0}
+          </span>
+        </div>
       </header>
 
       <main className="workspace">
@@ -3594,13 +4599,28 @@ export default function App() {
           <div className="counts">
             <span><b>{totals.PENDING_REVIEW || 0}</b> awaiting review</span>
             <span><b>{totals.PAID || 0}</b> tickets issued</span>
-            <span><b>{stats.checkedIn || 0}</b> admitted</span>
+            <span><b style={{ color: '#c6f24e' }}>{stats.checkedIn || 0}</b> admitted</span>
           </div>
         </div>
 
         {loadError && <p className="form-error" role="alert">{loadError}</p>}
 
         {tab === 'dashboard' && <Dashboard stats={stats} referralSummary={referralSummary} onNavigate={changeTab} />}
+        {tab === 'checkin' && <TicketScan onCheckedIn={load} onNavigate={changeTab} />}
+        {tab === 'admitted' && (
+          <AdmittedView
+            registrations={registrations}
+            onActionComplete={load}
+            onNavigate={changeTab}
+          />
+        )}
+        {tab === 'reminders' && (
+          <RemindersView
+            registrations={registrations}
+            onActionComplete={load}
+            onOpenEmail={openEmailModal}
+          />
+        )}
         {tab === 'payments' && (
           <PaymentQueue
             registrations={registrations}
@@ -3615,7 +4635,6 @@ export default function App() {
             onOpenEmail={openEmailModal}
           />
         )}
-        {tab === 'checkin' && <TicketScan onCheckedIn={load} />}
         {tab === 'teams' && (
           <RegistrationTable
             registrations={registrations}
@@ -3631,6 +4650,53 @@ export default function App() {
         {tab === 'referrals' && <ReferralsView onActionComplete={load} />}
         {tab === 'settings' && <SettingsView onActionComplete={load} />}
       </main>
+
+      {/* Fixed Mobile Bottom Navigation Bar */}
+      <nav className="mobile-bottom-nav" aria-label="Mobile Navigation">
+        <button
+          type="button"
+          className={`mobile-nav-item mobile-nav-item--checkin ${tab === 'checkin' ? 'is-active' : ''}`}
+          onClick={() => changeTab('checkin')}
+        >
+          <span className="mobile-nav-icon">📷</span>
+          <span>Check-in</span>
+        </button>
+        <button
+          type="button"
+          className={`mobile-nav-item ${tab === 'admitted' ? 'is-active' : ''}`}
+          onClick={() => changeTab('admitted')}
+        >
+          <span className="mobile-nav-icon">✓</span>
+          <span>Admitted</span>
+          {Boolean(stats.checkedIn) && (
+            <span className="mobile-nav-badge mobile-nav-badge--green">{stats.checkedIn}</span>
+          )}
+        </button>
+        <button
+          type="button"
+          className={`mobile-nav-item ${tab === 'reminders' ? 'is-active' : ''}`}
+          onClick={() => changeTab('reminders')}
+        >
+          <span className="mobile-nav-icon">📢</span>
+          <span>Reminders</span>
+        </button>
+        <button
+          type="button"
+          className={`mobile-nav-item ${tab === 'teams' ? 'is-active' : ''}`}
+          onClick={() => changeTab('teams')}
+        >
+          <span className="mobile-nav-icon">👥</span>
+          <span>Teams</span>
+        </button>
+        <button
+          type="button"
+          className={`mobile-nav-item ${['dashboard', 'payments', 'tickets', 'coupons', 'referrals', 'settings'].includes(tab) ? 'is-active' : ''}`}
+          onClick={() => setMobileDrawerOpen(true)}
+        >
+          <span className="mobile-nav-icon">☰</span>
+          <span>More</span>
+        </button>
+      </nav>
 
       {/* Manual Email Modal */}
       {emailModalItem && (
