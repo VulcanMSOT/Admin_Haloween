@@ -7,8 +7,12 @@
     "dev": "vite",
     "dev:vercel": "vercel dev",
     "build": "prisma generate && vite build",
+    "start": "node server.js",
     "postinstall": "prisma generate",
     "lint": "oxlint"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.1",
@@ -17,6 +21,7 @@
     "dotenv": "^18.0.9",
     "html5-qrcode": "^2.3.8",
     "pg": "^8.23.1",
+    "prisma": "^7.10.1",
     "qrcode": "^1.5.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
@@ -25,7 +30,6 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.2",
     "oxlint": "^1.88.0",
-    "prisma": "^7.10.1",
     "vite": "^8.3.4"
   }
 }

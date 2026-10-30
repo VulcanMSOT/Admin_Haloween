@@ -7,7 +7,7 @@ Event operations, manual UPI payment verification, ticketing, manual Gmail deliv
 ## 1. Architecture & Free-Tier Design
 
 - **Frontend**: Vite + React 18, responsive dark-mode operations dashboard, `html5-qrcode` mobile camera scanner.
-- **Backend**: Node.js Vercel Serverless Functions (`/api/*`).
+- **Backend**: Node.js Web Service (Render / Docker) or Vercel Serverless Functions (`/api/*`). See [RENDER_DEPLOY.md](./RENDER_DEPLOY.md) for Render deployment guide.
 - **Database**: Shared Supabase PostgreSQL with [Vulcan Public Site](https://github.com/VulcanMSOT/Vulcan).
 - **Storage**: Supabase Storage private bucket `payment-screenshots` with temporary signed URLs for verification.
 - **Email Delivery Model**: **100% Free Manual Workflow**.
