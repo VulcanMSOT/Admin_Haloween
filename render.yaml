@@ -32,3 +32,4 @@ services:
         value: https://vulcan-club.vercel.app
       - key: VITE_PUBLIC_SITE_URL
         value: https://vulcan-club.vercel.app
+

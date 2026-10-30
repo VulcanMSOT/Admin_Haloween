@@ -1,0 +1,26 @@
+name: Keep Render Admin Alive
+
+on:
+  schedule:
+    # Runs every 10 minutes (UTC)
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Admin Healthcheck
+        run: |
+          TARGET_URL="${{ secrets.RENDER_ADMIN_URL }}"
+          if [ -z "$TARGET_URL" ]; then
+            TARGET_URL="https://admin-haloween.onrender.com"
+          fi
+          echo "Pinging $TARGET_URL/healthz..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$TARGET_URL/healthz" || true)
+          echo "Received status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "Render Admin is active and healthy!"
+          else
+            echo "Render may be starting up (status: $HTTP_STATUS)"
+          fi

@@ -73,6 +73,23 @@ Because `render.yaml` is included in the repository, you can alternatively use R
 
 ---
 
+## Anti-Sleep & Always-Active Configuration
+
+Render Free tier Web Services spin down into sleep mode after 15 minutes of inactivity if no HTTP traffic is received.
+
+To keep your service permanently active:
+
+1. **Automatic Internal Keep-Alive (Built-in)**:
+   - `server.js` automatically sends an external ping to `/healthz` every **8 minutes**.
+   - Render automatically provides `RENDER_EXTERNAL_URL` in your environment (e.g., `https://vulcan-admin.onrender.com`), or discovers it from the first visitor.
+   - When this ping hits Render's public router, Render resets its 15-minute idle timer, keeping the service hot.
+
+2. **External Keep-Alive (Redundancy)**:
+   - A GitHub Actions workflow is included at `.github/workflows/keep-alive.yml`. It pings your `/healthz` endpoint every 10 minutes from GitHub's servers.
+   - You can also paste your Render URL (e.g., `https://vulcan-admin.onrender.com/healthz`) into a free monitoring service like [cron-job.org](https://cron-job.org) or [UptimeRobot](https://uptimerobot.com) to ping every 5 or 10 minutes.
+
+---
+
 ## Verification Checklist
 
 Once Render deploys your URL (e.g. `https://vulcan-admin.onrender.com`):
@@ -84,3 +101,4 @@ Once Render deploys your URL (e.g. `https://vulcan-admin.onrender.com`):
    - Edit coupons and referral settings.
    - Scan tickets via mobile check-in.
    - Export attendee CSV without timeout errors.
+

@@ -18,6 +18,40 @@ const DIST_DIR = path.resolve(process.cwd(), 'dist');
 const API_DIR = path.resolve(process.cwd(), 'api');
 
 const handlerCache = new Map();
+let discoveredUrl = null;
+const PING_INTERVAL_MS = (parseInt(process.env.KEEP_ALIVE_INTERVAL_MINUTES || '8', 10)) * 60 * 1000;
+
+function initKeepAlive() {
+  // Run in production, on Render, or when KEEP_ALIVE is enabled
+  if (process.env.NODE_ENV !== 'production' && !process.env.RENDER && !process.env.ENABLE_KEEP_ALIVE) {
+    return;
+  }
+
+  console.log(`[Keep-Alive] Anti-sleep runner started. Interval: ${PING_INTERVAL_MS / 60000} mins.`);
+
+  // Initial ping 45 seconds after launch
+  setTimeout(pingSelf, 45000);
+
+  // Recurring ping every 8 mins (Render idle sleep threshold is 15 mins)
+  setInterval(pingSelf, PING_INTERVAL_MS);
+}
+
+async function pingSelf() {
+  const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL || process.env.SELF_URL || discoveredUrl;
+  if (!baseUrl) {
+    return;
+  }
+
+  const pingUrl = `${baseUrl.replace(/\/$/, '')}/healthz`;
+  try {
+    const res = await fetch(pingUrl, {
+      headers: { 'User-Agent': 'VulcanAdmin-KeepAlive/1.0' },
+    });
+    console.log(`[Keep-Alive] Pinged ${pingUrl} -> Status ${res.status} (${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })} IST)`);
+  } catch (err) {
+    console.warn(`[Keep-Alive] Ping warning for ${pingUrl}: ${err.message}`);
+  }
+}
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -84,6 +118,13 @@ const server = http.createServer(async (req, res) => {
   const reqUrl = req.url || '/';
   const parsedUrl = new URL(reqUrl, `http://${req.headers.host || 'localhost'}`);
   const pathname = parsedUrl.pathname;
+
+  // Auto-discover external host URL from first external incoming request if not pre-configured
+  if (!discoveredUrl && req.headers.host && !req.headers.host.includes('localhost') && !req.headers.host.includes('127.0.0.1')) {
+    const proto = req.headers['x-forwarded-proto'] || 'https';
+    discoveredUrl = `${proto}://${req.headers.host}`;
+    console.log(`[Keep-Alive] Discovered external public host URL: ${discoveredUrl}`);
+  }
 
   // Health check endpoint for Render zero-downtime monitoring
   if (pathname === '/healthz' || pathname === '/health' || pathname === '/api/health') {
@@ -180,6 +221,7 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`[Vulcan Admin] Server running on http://${HOST}:${PORT}`);
   console.log(`[Vulcan Admin] Environment: ${process.env.NODE_ENV || 'development'}`);
+  initKeepAlive();
 });
 
 function handleShutdown(signal) {
