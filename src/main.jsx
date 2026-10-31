@@ -1828,6 +1828,40 @@ function AdmittedView({ registrations, onActionComplete, onNavigate }) {
           >
             ⚡ Door Check-in
           </button>
+          <a
+            className="export"
+            href="/hack_o_lantern_team_qrs_4per_page.pdf"
+            download="hack_o_lantern_team_qrs_4per_page.pdf"
+            style={{
+              minHeight: '38px',
+              padding: '0 16px',
+              fontSize: '13px',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+            title="Printable evaluation & leaderboard QR code passes (4 cards per A4 page)"
+          >
+            🖨️ Evaluation QRs (4/page)
+          </a>
+          <a
+            className="quiet"
+            href="/hack_o_lantern_team_qrs_large_placards.pdf"
+            download="hack_o_lantern_team_qrs_large_placards.pdf"
+            style={{
+              minHeight: '38px',
+              padding: '0 14px',
+              fontSize: '13px',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+            title="Large horizontal table tent placards (1 per A4 page)"
+          >
+            🏷️ Large Placards (1/page)
+          </a>
           <button
             type="button"
             className="export"
@@ -2450,6 +2484,14 @@ function RegistrationTable({ registrations, search, setSearch, status, setStatus
           >
             {copiedBulk || '📋 Copy attendee emails'}
           </button>
+          <a
+            className="export"
+            href="/hack_o_lantern_team_qrs_4per_page.pdf"
+            download="hack_o_lantern_team_qrs_4per_page.pdf"
+            title="Download printable evaluation & leaderboard QR codes PDF (4 per A4 page)"
+          >
+            🖨️ Evaluation QRs ↗
+          </a>
           <a className="export" href="/api/export">Export CSV ↗</a>
         </div>
       </div>
