@@ -134,12 +134,17 @@ export async function generateCertificateSvg({
     <text x="204" y="242" font-family="'Montserrat', 'Inter', -apple-system, sans-serif" font-size="34" font-weight="800" fill="#1A1A1A" letter-spacing="0.5" text-anchor="middle">vulcan club</text>
   </g>
 
-  <!-- Presents Divider Rule (EXACT VECTOR PATH) -->
+  <!-- Presents Divider Rule (BÉZIER VECTOR PATH & FLANKING LINES) -->
+  <line x1="270" y1="133" x2="380" y2="133" stroke="#1A1A1A" stroke-width="1.0"/>
   <path d="${PRESENTS_DIVIDER_PATH}" fill="#1A1A1A"/>
+  <line x1="740" y1="133" x2="850" y2="133" stroke="#1A1A1A" stroke-width="1.0"/>
 
-  <!-- 6. Main Certificate Title: CERTIFICATE OF PARTICIPATION (EXACT VECTOR PATHS) -->
+  <!-- 6. Main Certificate Title: CERTIFICATE OF PARTICIPATION (BÉZIER VECTOR PATHS) -->
   <path d="${CERTIFICATE_TITLE_PATH}" fill="#1A1A1A"/>
+  <!-- OF PARTICIPATION with flanking orange rules -->
+  <line x1="385" y1="245" x2="450" y2="245" stroke="#EF541E" stroke-width="1.8"/>
   <path d="${OF_PARTICIPATION_PATH}" fill="#EF541E"/>
+  <line x1="670" y1="245" x2="735" y2="245" stroke="#EF541E" stroke-width="1.8"/>
 
   <!-- 7. Event Title: HACK- 🎃 -LANTERN (EXACT VECTOR PATHS) -->
   <path d="${HACK_LANTERN_PATH}" fill="#1A1A1A"/>
