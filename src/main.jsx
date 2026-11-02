@@ -4414,6 +4414,77 @@ function ReferralsView({ onActionComplete }) {
 }
 
 // -------------------------------------------------------------
+// Participation Certificate Helpers & Email Content
+// -------------------------------------------------------------
+function buildCertificateEmailContent(participant) {
+  const certId = participant.certificateId;
+  const name = participant.fullName || 'Participant';
+  const team = participant.teamName || 'Team';
+  const teamId = participant.teamId || '';
+  const college = participant.college || 'Mirai School of Technology';
+
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.vulcanclub.in';
+  const certOnlineUrl = `${origin}/api/certificate-render?certId=${encodeURIComponent(certId)}&memberId=${encodeURIComponent(participant.memberId)}`;
+  const certDownloadUrl = `${certOnlineUrl}&format=png`;
+
+  const subject = `🎓 Official Certificate of Participation · Hack-O-Lantern 2026 (${certId})`;
+
+  const body = `Dear ${name},
+
+Congratulations on participating in Hack-O-Lantern 2026! Through the 12-hour overnight hackathon on 31 October & 1 November 2026, your team "${team}" (${teamId}) built, learned, and presented an incredible project.
+
+In recognition of your active participation and hard work, the Vulcan Club and Mirai School of Technology proudly confer your official Certificate of Participation.
+
+Certificate Details:
+• Recipient: ${name}
+• Team Name: ${team} (${teamId})
+• Institution: ${college}
+• Certificate ID: ${certId}
+
+Your official high-resolution certificate image (PNG) is attached with this email.
+
+You can also view, verify, and download your certificate anytime online via the official ledger:
+${certOnlineUrl}
+
+(Direct high-res PNG download: ${certDownloadUrl})
+
+Congratulations once again!
+
+Best regards,
+Vulcan Club × Mirai School of Technology
+Organizing Team • Hack-O-Lantern 2026
+Official Site: https://www.vulcanclub.in
+Contact: nexcell_rathinam@msot.org`;
+
+  return { subject, body, certOnlineUrl, certDownloadUrl };
+}
+
+async function triggerCertificateDownloadAndCopy(participant) {
+  const certId = participant.certificateId;
+  const memberId = participant.memberId;
+  const pngUrl = `/api/certificate-render?certId=${encodeURIComponent(certId)}&memberId=${encodeURIComponent(memberId)}&format=png`;
+
+  // 1. Download PNG directly
+  const a = document.createElement('a');
+  a.href = pngUrl;
+  a.download = `${certId}.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  // 2. Try copying PNG image to clipboard for easy Cmd+V pasting into Gmail compose
+  try {
+    const resp = await fetch(pngUrl);
+    const blob = await resp.blob();
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    }
+  } catch (clipErr) {
+    console.warn('Clipboard write fallback:', clipErr);
+  }
+}
+
+// -------------------------------------------------------------
 // Participation Certificate Preview Modal
 // -------------------------------------------------------------
 function CertificatePreviewModal({ participant, participants, onSelectParticipant, onClose, onEmailSent }) {
@@ -4438,17 +4509,29 @@ function CertificatePreviewModal({ participant, participants, onSelectParticipan
       });
   }, [participant]);
 
-  const handleSendEmail = async () => {
-    if (!confirm(`Email official certificate to ${participant.fullName} (${participant.email})?`)) return;
+  const handleSendGmail = async () => {
     setEmailing(true);
     setMsg('');
     try {
-      const res = await api('certificate-email', {
+      // 1. Build content & Gmail URL
+      const { subject, body } = buildCertificateEmailContent(participant);
+      const recipient = participant.email || '';
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipient)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+      // 2. Open Gmail compose immediately (synchronously in user click)
+      window.open(gmailUrl, '_blank');
+
+      // 3. Download certificate PNG & copy to clipboard
+      await triggerCertificateDownloadAndCopy(participant);
+
+      // 4. Mark certificate as sent in database
+      await api('certificate-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send_single', memberId: participant.memberId }),
+        body: JSON.stringify({ action: 'mark_sent', memberId: participant.memberId, certId: participant.certificateId }),
       });
-      setMsg(res.message || 'Certificate successfully emailed!');
+
+      setMsg(`✓ Opened Gmail compose! Certificate PNG downloaded & copied to clipboard (press Cmd+V or drag to attach in Gmail).`);
       if (onEmailSent) onEmailSent();
     } catch (err) {
       setMsg('Error: ' + err.message);
@@ -4526,8 +4609,8 @@ function CertificatePreviewModal({ participant, participants, onSelectParticipan
             <button type="button" className="btn-cert-secondary" onClick={openPrint}>
               🖨️ Fullscreen / Print PDF
             </button>
-            <button type="button" className="btn-cert-secondary" onClick={handleSendEmail} disabled={emailing}>
-              {emailing ? 'Sending...' : `📧 Email PNG`}
+            <button type="button" className="btn-cert-secondary" onClick={handleSendGmail} disabled={emailing}>
+              {emailing ? 'Opening Gmail...' : `📧 Send via Gmail`}
             </button>
           </div>
         </div>
@@ -4585,19 +4668,30 @@ function CertificatesView({ onNavigate }) {
     }
   };
 
-  // Send single email
+  // Send single email via Gmail
   const handleSendSingle = async (member) => {
-    if (!confirm(`Email official certificate to ${member.fullName} (${member.email})?`)) return;
-    setBusyAction(`Sending certificate to ${member.fullName}...`);
+    setBusyAction(`Opening Gmail compose for ${member.fullName}...`);
     setError('');
     setNotice('');
     try {
-      const res = await api('certificate-email', {
+      const { subject, body } = buildCertificateEmailContent(member);
+      const recipient = member.email || '';
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipient)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+      // 1. Open Gmail compose immediately (synchronously in user click)
+      window.open(gmailUrl, '_blank');
+
+      // 2. Download certificate PNG & copy image to clipboard
+      await triggerCertificateDownloadAndCopy(member);
+
+      // 3. Mark as sent in database
+      await api('certificate-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send_single', memberId: member.memberId }),
+        body: JSON.stringify({ action: 'mark_sent', memberId: member.memberId, certId: member.certificateId }),
       });
-      setNotice(res.message);
+
+      setNotice(`✓ Opened Gmail compose for ${member.fullName}! Certificate PNG downloaded & copied to clipboard (press Cmd+V or drag to attach in Gmail).`);
       await loadData();
     } catch (err) {
       setError(err.message);
@@ -4606,19 +4700,71 @@ function CertificatesView({ onNavigate }) {
     }
   };
 
-  // Send team email
+  // Send team email via Gmail
   const handleSendTeam = async (teamId, teamName) => {
-    if (!confirm(`Email certificates to ALL members of Team ${teamName} (${teamId})?`)) return;
-    setBusyAction(`Sending certificates to Team ${teamName}...`);
+    setBusyAction(`Opening Gmail for Team ${teamName}...`);
     setError('');
     setNotice('');
     try {
-      const res = await api('certificate-email', {
+      const teamMembers = participants.filter((p) => p.teamId === teamId);
+      if (teamMembers.length === 0) {
+        throw new Error(`No members found for Team ${teamId}`);
+      }
+
+      const allEmails = teamMembers.map((m) => m.email).filter(Boolean);
+      const recipient = allEmails.join(',');
+
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://www.vulcanclub.in';
+      const subject = `🎓 Official Certificates of Participation · Team "${teamName}" (${teamId}) • Hack-O-Lantern 2026`;
+
+      const memberListText = teamMembers.map((m) => {
+        const certUrl = `${origin}/api/certificate-render?certId=${encodeURIComponent(m.certificateId)}&memberId=${encodeURIComponent(m.memberId)}`;
+        const certDownloadUrl = `${certUrl}&format=png`;
+        return `• ${m.fullName} (${m.email})\n  Certificate ID: ${m.certificateId}\n  View/Verify: ${certUrl}\n  Direct PNG Download: ${certDownloadUrl}`;
+      }).join('\n\n');
+
+      const body = `Dear Team ${teamName},
+
+Congratulations on participating in Hack-O-Lantern 2026! Through the 12-hour overnight hackathon on 31 October & 1 November 2026, your team engineered, designed, and presented an outstanding hackathon solution.
+
+In recognition of your hard work and achievement, the Vulcan Club and Mirai School of Technology proudly confer the official Certificates of Participation for your team members:
+
+${memberListText}
+
+Your team's high-resolution certificate images (PNG) are attached with this email. All certificates are cryptographically verified and can be shared on LinkedIn, resume, or portfolio.
+
+Congratulations once again!
+
+Best regards,
+Vulcan Club × Mirai School of Technology
+Organizing Team • Hack-O-Lantern 2026
+Official Site: https://www.vulcanclub.in
+Contact: nexcell_rathinam@msot.org`;
+
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipient)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+      // 1. Open Gmail compose immediately
+      window.open(gmailUrl, '_blank');
+
+      // 2. Download certificates for each member of the team
+      for (const m of teamMembers) {
+        const pngUrl = `/api/certificate-render?certId=${encodeURIComponent(m.certificateId)}&memberId=${encodeURIComponent(m.memberId)}&format=png`;
+        const a = document.createElement('a');
+        a.href = pngUrl;
+        a.download = `${m.certificateId}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+
+      // 3. Mark team certificates as sent in database
+      await api('certificate-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send_team', teamId }),
+        body: JSON.stringify({ action: 'mark_team_sent', teamId }),
       });
-      setNotice(res.message);
+
+      setNotice(`✓ Opened Gmail compose for Team ${teamName} (${teamMembers.length} recipients)! All certificates downloaded.`);
       await loadData();
     } catch (err) {
       setError(err.message);
@@ -4627,22 +4773,47 @@ function CertificatesView({ onNavigate }) {
     }
   };
 
-  // Batch send all
-  const handleBatchSendAll = async (onlyAdmitted = false) => {
-    const scopeStr = onlyAdmitted ? 'admitted (checked-in)' : 'all eligible';
-    if (!confirm(`Are you sure you want to email certificates to ALL pending ${scopeStr} participants? This will queue and send emails via Resend.`)) return;
+  // Batch send announcement via Gmail
+  const handleBatchSendAll = async () => {
+    const pendingParticipants = participants.filter((p) => p.emailStatus !== 'sent');
+    if (pendingParticipants.length === 0) {
+      alert('All participants have already received their certificates!');
+      return;
+    }
 
-    setBusyAction('Dispatching batch certificate emails...');
+    const allEmails = Array.from(new Set(pendingParticipants.map((p) => p.email).filter(Boolean)));
+    if (!confirm(`Open Gmail to compose a certificate broadcast to all ${allEmails.length} pending participants in BCC?`)) return;
+
+    setBusyAction('Opening Gmail broadcast compose...');
     setError('');
     setNotice('');
     try {
-      const res = await api('certificate-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send_all', onlyPending: true, onlyAdmitted }),
-      });
-      setNotice(res.message);
-      await loadData();
+      const subject = `🎓 Hack-O-Lantern 2026 Certificates of Participation are Available!`;
+      const body = `Dear Hack-O-Lantern 2026 Participants,
+
+Congratulations on building, innovating, and celebrating through the night at Hack-O-Lantern 2026!
+
+The Vulcan Club and Mirai School of Technology have officially issued your verified Certificates of Participation.
+
+To view, download your high-resolution PNG certificate, and verify your credentials on the official ledger:
+https://www.vulcanclub.in/halloween-hack
+
+(On the page, click "Check status / Certificate" and enter your Team ID or registered email address).
+
+All certificates are cryptographically verified and can be shared directly on LinkedIn, resume, or portfolio!
+
+Congratulations once again!
+
+Best regards,
+Vulcan Club × Mirai School of Technology
+Organizing Team • Hack-O-Lantern 2026
+Official Site: https://www.vulcanclub.in
+Contact: nexcell_rathinam@msot.org`;
+
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&bcc=${encodeURIComponent(allEmails.join(','))}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.open(gmailUrl, '_blank');
+
+      setNotice(`✓ Opened Gmail compose with ${allEmails.length} recipient emails in BCC.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -4650,26 +4821,24 @@ function CertificatesView({ onNavigate }) {
     }
   };
 
-  // Test email
-  const handleSendTest = async (e) => {
+  // Test Gmail preview
+  const handleSendTest = (e) => {
     e.preventDefault();
-    if (!testEmailInput.trim()) return;
-    setBusyAction('Sending sample preview email...');
-    setError('');
-    setNotice('');
-    try {
-      const res = await api('certificate-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'test_preview', testEmail: testEmailInput.trim() }),
-      });
-      setNotice(res.message);
-      setShowTestModal(false);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusyAction('');
-    }
+    const recipient = testEmailInput.trim();
+    if (!recipient) return;
+    const sample = participants[0] || {
+      fullName: 'Raj Jasani',
+      email: recipient,
+      teamName: 'ZomByte',
+      teamId: 'VHK-1011',
+      certificateId: 'HOL26-PART-VHK1011-01',
+      memberId: 'demo-member',
+    };
+    const { subject, body } = buildCertificateEmailContent(sample);
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipient)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(gmailUrl, '_blank');
+    setShowTestModal(false);
+    setNotice(`✓ Opened test compose in Gmail for ${recipient}!`);
   };
 
   return (
@@ -4700,16 +4869,16 @@ function CertificatesView({ onNavigate }) {
             className="btn-cert-secondary"
             onClick={() => setShowTestModal(true)}
           >
-            🧪 Test Email to Myself
+            🧪 Test Preview in Gmail
           </button>
 
           <button
             type="button"
             className="btn-cert-primary"
-            onClick={() => handleBatchSendAll(false)}
+            onClick={() => handleBatchSendAll()}
             disabled={Boolean(busyAction) || stats.totalPending === 0}
           >
-            📧 Batch Email All ({stats.totalPending})
+            📧 Gmail Broadcast to Pending ({stats.totalPending})
           </button>
 
           <button
@@ -4751,7 +4920,7 @@ function CertificatesView({ onNavigate }) {
         <div className="stat-card">
           <span className="stat-card__label">Emailed to Members</span>
           <span className="stat-card__value stat-card__value--valid">{stats.totalEmailed || 0}</span>
-          <span className="stat-card__sub">Dispatched via Resend</span>
+          <span className="stat-card__sub">Dispatched via Gmail</span>
         </div>
 
         <div className="stat-card">
@@ -4897,10 +5066,10 @@ function CertificatesView({ onNavigate }) {
                         className={`table-action ${isSent ? '' : 'btn-approve'}`}
                         onClick={() => handleSendSingle(p)}
                         disabled={Boolean(busyAction)}
-                        title={isSent ? 'Resend certificate email' : 'Send certificate email'}
+                        title={isSent ? 'Resend certificate via Gmail' : 'Open Gmail compose with certificate'}
                         style={{ marginRight: '6px' }}
                       >
-                        {isSent ? 'Resend' : '📧 Send'}
+                        {isSent ? 'Resend in Gmail' : '📧 Send in Gmail'}
                       </button>
 
                       <button

@@ -20,10 +20,96 @@ export default async function handler(request, response) {
   if (!session) return;
 
   const body = parseBody(request);
-  const action = body.action || 'send_single'; // 'send_single' | 'send_team' | 'send_all' | 'test_preview'
+  const action = body.action || 'send_single'; // 'send_single' | 'send_team' | 'send_all' | 'test_preview' | 'mark_sent' | 'mark_team_sent'
+
+  // 1. Mark as sent via Gmail
+  if (action === 'mark_sent') {
+    const { memberId, certId } = body;
+    if (!memberId) {
+      return json(response, 400, { error: 'memberId is required.' });
+    }
+
+    try {
+      const member = await prisma.teamMember.findUnique({
+        where: { id: memberId },
+        include: { registration: true },
+      });
+
+      if (!member) {
+        return json(response, 404, { error: 'Participant not found.' });
+      }
+
+      const reg = member.registration || {};
+      const effectiveCertId = certId || generateCertificateId(reg.teamId, member.position);
+
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO certificates (id, team_id, member_id, recipient_name, recipient_email, team_name, college, certificate_type, issued_at, email_status, email_sent_at, email_id, email_error)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'participation', NOW(), 'sent', NOW(), 'gmail-manual', NULL)
+        ON CONFLICT (member_id) DO UPDATE SET
+          id = EXCLUDED.id,
+          email_status = 'sent',
+          email_sent_at = NOW(),
+          email_id = 'gmail-manual',
+          email_error = NULL
+      `, effectiveCertId, reg.teamId || 'TEAM', member.id, member.fullName, member.email, reg.teamName, member.college || 'Mirai School of Technology');
+
+      return json(response, 200, {
+        ok: true,
+        message: `Marked certificate ${effectiveCertId} as sent via Gmail!`,
+        certId: effectiveCertId,
+      });
+    } catch (err) {
+      console.error('Mark sent error:', err);
+      return json(response, 500, { error: err.message || 'Failed to mark certificate as sent.' });
+    }
+  }
+
+  // 2. Mark all members of a team as sent via Gmail
+  if (action === 'mark_team_sent') {
+    const { teamId } = body;
+    if (!teamId) {
+      return json(response, 400, { error: 'teamId is required.' });
+    }
+
+    try {
+      const registration = await prisma.registration.findFirst({
+        where: { teamId },
+        include: { members: true },
+      });
+
+      if (!registration) {
+        return json(response, 404, { error: `Team ${teamId} not found.` });
+      }
+
+      for (const m of registration.members) {
+        const certId = generateCertificateId(registration.teamId, m.position);
+        await prisma.$executeRawUnsafe(`
+          INSERT INTO certificates (id, team_id, member_id, recipient_name, recipient_email, team_name, college, certificate_type, issued_at, email_status, email_sent_at, email_id, email_error)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, 'participation', NOW(), 'sent', NOW(), 'gmail-manual', NULL)
+          ON CONFLICT (member_id) DO UPDATE SET
+            id = EXCLUDED.id,
+            email_status = 'sent',
+            email_sent_at = NOW(),
+            email_id = 'gmail-manual',
+            email_error = NULL
+        `, certId, registration.teamId || 'TEAM', m.id, m.fullName, m.email, registration.teamName, m.college || 'Mirai School of Technology');
+      }
+
+      return json(response, 200, {
+        ok: true,
+        message: `Marked Team ${registration.teamName} (${teamId}) certificates as sent via Gmail!`,
+      });
+    } catch (err) {
+      return json(response, 500, { error: err.message || 'Failed to mark team certificates as sent.' });
+    }
+  }
 
   if (!process.env.RESEND_API_KEY) {
-    return json(response, 500, { error: 'RESEND_API_KEY is not configured on the server.' });
+    return json(response, 200, {
+      ok: true,
+      mode: 'gmail',
+      message: 'RESEND_API_KEY is not configured on the server. Certificates are dispatched via Gmail.',
+    });
   }
 
   const resend = new Resend(process.env.RESEND_API_KEY);
