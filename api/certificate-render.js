@@ -1,5 +1,5 @@
 import { prisma } from './_lib/prisma.js';
-import { generateCertificateId, generateCertificateSvg } from './_lib/certificate-generator.js';
+import { generateCertificateId, generateCertificateSvg, generateCertificatePng } from './_lib/certificate-generator.js';
 
 export default async function handler(request, response) {
   const certId = String(request.query.certId || '').trim();
@@ -72,7 +72,7 @@ export default async function handler(request, response) {
     const registration = member.registration || { teamId: 'VHK-1011', teamName: 'ZomByte' };
     const effectiveCertId = certId || generateCertificateId(registration.teamId, member.position);
 
-    const svg = await generateCertificateSvg({
+    const certParams = {
       certificateId: effectiveCertId,
       participantName: member.fullName,
       collegeName: member.college,
@@ -80,7 +80,17 @@ export default async function handler(request, response) {
       teamId: registration.teamId,
       trackName: 'Open Innovation & Systems',
       issueDate: 'November 1, 2026',
-    });
+    };
+
+    if (format === 'png') {
+      const pngBuffer = await generateCertificatePng(certParams, 2240);
+      response.statusCode = 200;
+      response.setHeader('Content-Type', 'image/png');
+      response.setHeader('Content-Disposition', `attachment; filename="${effectiveCertId}.png"`);
+      return response.end(pngBuffer);
+    }
+
+    const svg = await generateCertificateSvg(certParams);
 
     if (format === 'svg') {
       response.statusCode = 200;
@@ -235,8 +245,8 @@ export default async function handler(request, response) {
 <body>
   <div class="toolbar">
     <span>📜 ${effectiveCertId}</span>
-    <button class="btn" onclick="window.print()">🖨️ Print / Save PDF</button>
-    <a class="btn btn-secondary" href="/api/certificate-render?certId=${encodeURIComponent(effectiveCertId)}&memberId=${encodeURIComponent(member.id)}&format=svg" download="${effectiveCertId}.svg">⬇️ Download SVG</a>
+    <a class="btn" href="/api/certificate-render?certId=${encodeURIComponent(effectiveCertId)}&memberId=${encodeURIComponent(member.id)}&format=png" download="${effectiveCertId}.png">🖼️ Download PNG</a>
+    <button class="btn btn-secondary" onclick="window.print()">🖨️ Print / Save PDF</button>
   </div>
 
   <div class="cert-frame">

@@ -2,7 +2,7 @@ import { Resend } from 'resend';
 import { handleCors, json, methodNotAllowed, parseBody } from './_lib/http.js';
 import { prisma } from './_lib/prisma.js';
 import { requireSession } from './_lib/session.js';
-import { generateCertificateId, generateCertificateSvg, buildCertificateEmailHtml } from './_lib/certificate-generator.js';
+import { generateCertificateId, generateCertificateSvg, generateCertificatePng, buildCertificateEmailHtml } from './_lib/certificate-generator.js';
 
 function getSender() {
   return process.env.RESEND_FROM || 'onboarding@resend.dev';
@@ -39,8 +39,8 @@ export default async function handler(request, response) {
     const certId = generateCertificateId(registration.teamId, member.position);
     const downloadUrl = `${siteUrl}/api/certificate-render?certId=${encodeURIComponent(certId)}&memberId=${encodeURIComponent(member.id)}`;
 
-    // 1. Generate SVG certificate
-    const svgContent = await generateCertificateSvg({
+    // 1. Generate High-Res PNG & SVG certificate
+    const certOptions = {
       certificateId: certId,
       participantName: member.fullName,
       collegeName: member.college,
@@ -48,7 +48,9 @@ export default async function handler(request, response) {
       teamId: registration.teamId,
       trackName: 'Open Innovation & Systems',
       issueDate: 'November 1, 2026',
-    });
+    };
+
+    const pngBuffer = await generateCertificatePng(certOptions, 2240);
 
     // 2. Build HTML email
     const htmlEmail = buildCertificateEmailHtml({
@@ -61,17 +63,18 @@ export default async function handler(request, response) {
 
     const emailSubject = `🎓 Your Official Hack-O-Lantern 2026 Certificate · ${certId}`;
 
-    // 3. Send email via Resend
+    // 3. Send email via Resend with high-res PNG attachment
     const { data, error } = await resend.emails.send({
       from: getSender(),
       to: [recipientEmail],
       subject: emailSubject,
       html: htmlEmail,
-      text: `Congratulations ${member.fullName}!\n\nHere is your official Certificate of Participation for Hack-O-Lantern 2026 (Team: ${registration.teamName}, Team ID: ${registration.teamId}).\n\nCertificate ID: ${certId}\n\nView and download your certificate here:\n${downloadUrl}\n\nVulcan Club × Mirai School of Technology`,
+      text: `Congratulations ${member.fullName}!\n\nHere is your official Certificate of Participation for Hack-O-Lantern 2026 (Team: ${registration.teamName}, Team ID: ${registration.teamId}).\n\nCertificate ID: ${certId}\n\nYour high-resolution certificate image (PNG) is attached.\n\nView and verify your certificate online:\n${downloadUrl}\n\nVulcan Club × Mirai School of Technology`,
       attachments: [
         {
-          filename: `${certId}.svg`,
-          content: Buffer.from(svgContent, 'utf-8').toString('base64'),
+          filename: `${certId}.png`,
+          content: pngBuffer.toString('base64'),
+          contentType: 'image/png',
         },
       ],
       ...(process.env.RESEND_REPLY_TO ? { replyTo: process.env.RESEND_REPLY_TO } : {}),

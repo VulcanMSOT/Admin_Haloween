@@ -4457,14 +4457,12 @@ function CertificatePreviewModal({ participant, participants, onSelectParticipan
     }
   };
 
-  const downloadSvg = () => {
-    const blob = new Blob([svg], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
+  const downloadPng = () => {
+    const url = `/api/certificate-render?certId=${encodeURIComponent(participant.certificateId)}&memberId=${encodeURIComponent(participant.memberId)}&format=png`;
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${participant.certificateId}.svg`;
+    a.download = `${participant.certificateId}.png`;
     a.click();
-    URL.revokeObjectURL(url);
   };
 
   const openPrint = () => {
@@ -4522,14 +4520,14 @@ function CertificatePreviewModal({ participant, participants, onSelectParticipan
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button type="button" className="btn-cert-secondary" onClick={downloadSvg} disabled={!svg}>
-              ⬇️ Download SVG
+            <button type="button" className="btn-cert-primary" onClick={downloadPng} disabled={!svg}>
+              🖼️ Download PNG
             </button>
             <button type="button" className="btn-cert-secondary" onClick={openPrint}>
               🖨️ Fullscreen / Print PDF
             </button>
-            <button type="button" className="btn-cert-primary" onClick={handleSendEmail} disabled={emailing}>
-              {emailing ? 'Sending Email...' : `📧 Email to ${participant.fullName.split(' ')[0]}`}
+            <button type="button" className="btn-cert-secondary" onClick={handleSendEmail} disabled={emailing}>
+              {emailing ? 'Sending...' : `📧 Email PNG`}
             </button>
           </div>
         </div>

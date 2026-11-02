@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import { Resvg } from '@resvg/resvg-js';
 
 function escapeHtml(value) {
   return String(value || '').replace(/[&<>"']/g, (c) => ({
@@ -14,7 +15,8 @@ export function generateCertificateId(teamId, position = 1) {
 
 /**
  * Generates an ultra-crisp, printable vector SVG for the Hack-O-Lantern 2026 Participation Certificate.
- * Standard A4 Landscape Aspect Ratio (1120 x 792).
+ * Standard A4 Landscape Aspect Ratio (1120 x 792) with rich Halloween visuals:
+ * Glowing harvest moon, flying bats, ornate spiderwebs, carved Jack-O'-Lanterns, and gothic filigree.
  */
 export async function generateCertificateSvg({
   certificateId,
@@ -33,8 +35,8 @@ export async function generateCertificateSvg({
     margin: 1,
     width: 140,
     color: {
-      dark: '#ff8522',
-      light: '#0c0a12',
+      dark: '#ff7a1a',
+      light: '#09070f',
     },
   });
 
@@ -44,208 +46,360 @@ export async function generateCertificateSvg({
   const tid = escapeHtml(teamId || 'VHK-XXXX');
   const track = escapeHtml(trackName || 'Open Innovation & Systems');
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 792" width="1120" height="792" style="background:#07060a; aspect-ratio: 1120 / 792; width: 100%; height: auto; display: block; font-family:'Cinzel', 'Georgia', -apple-system, serif;">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 792" width="1120" height="792" style="background:#06040a; aspect-ratio: 1120 / 792; width: 100%; height: auto; display: block; font-family:'Cinzel', 'Georgia', -apple-system, serif;">
   <defs>
-    <!-- Background Gradient -->
-    <radialGradient id="bgGlow" cx="50%" cy="45%" r="65%">
-      <stop offset="0%" stop-color="#1c1228" stop-opacity="0.9"/>
-      <stop offset="45%" stop-color="#100b18" stop-opacity="0.95"/>
-      <stop offset="100%" stop-color="#07060a" stop-opacity="1"/>
+    <!-- Background Radiant Sky -->
+    <radialGradient id="bgGlow" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#1f1133" stop-opacity="1"/>
+      <stop offset="35%" stop-color="#130a21" stop-opacity="1"/>
+      <stop offset="70%" stop-color="#0a0512" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#050308" stop-opacity="1"/>
     </radialGradient>
 
-    <!-- Pumpkin Gold Gradient -->
+    <!-- Harvest Blood Moon Gradient -->
+    <radialGradient id="moonGlow" cx="42%" cy="42%" r="58%">
+      <stop offset="0%" stop-color="#fff8e7"/>
+      <stop offset="35%" stop-color="#fed7aa"/>
+      <stop offset="70%" stop-color="#fb923c"/>
+      <stop offset="92%" stop-color="#ea580c"/>
+      <stop offset="100%" stop-color="#c2410c"/>
+    </radialGradient>
+
+    <!-- Moon Atmospheric Fog Gradient -->
+    <radialGradient id="moonFog" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.32"/>
+      <stop offset="45%" stop-color="#a855f7" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#06040a" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Fiery Pumpkin Gold Gradient -->
     <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffe299"/>
-      <stop offset="30%" stop-color="#ff9a3c"/>
-      <stop offset="70%" stop-color="#ff7a1a"/>
-      <stop offset="100%" stop-color="#c85600"/>
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="25%" stop-color="#fdba74"/>
+      <stop offset="55%" stop-color="#ff7a1a"/>
+      <stop offset="85%" stop-color="#ea580c"/>
+      <stop offset="100%" stop-color="#b43403"/>
     </linearGradient>
 
-    <!-- Metallic Border Gradient -->
+    <!-- Metallic Ornate Border Gradient -->
     <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffb86c"/>
-      <stop offset="25%" stop-color="#e06000"/>
-      <stop offset="50%" stop-color="#ffe6a3"/>
-      <stop offset="75%" stop-color="#e06000"/>
-      <stop offset="100%" stop-color="#ff8e30"/>
+      <stop offset="0%" stop-color="#ffd280"/>
+      <stop offset="20%" stop-color="#ea580c"/>
+      <stop offset="50%" stop-color="#fef08a"/>
+      <stop offset="80%" stop-color="#ea580c"/>
+      <stop offset="100%" stop-color="#ff9a3c"/>
     </linearGradient>
 
     <!-- Purple Nebula Accent -->
-    <radialGradient id="purpleNebula" cx="15%" cy="85%" r="35%">
-      <stop offset="0%" stop-color="#7928ca" stop-opacity="0.25"/>
-      <stop offset="100%" stop-color="#07060a" stop-opacity="0"/>
+    <radialGradient id="purpleNebula" cx="15%" cy="85%" r="40%">
+      <stop offset="0%" stop-color="#9333ea" stop-opacity="0.22"/>
+      <stop offset="60%" stop-color="#6b21a8" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#06040a" stop-opacity="0"/>
     </radialGradient>
 
-    <radialGradient id="orangeNebula" cx="85%" cy="15%" r="40%">
-      <stop offset="0%" stop-color="#ff7a1a" stop-opacity="0.25"/>
-      <stop offset="100%" stop-color="#07060a" stop-opacity="0"/>
+    <radialGradient id="orangeNebula" cx="85%" cy="20%" r="45%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.22"/>
+      <stop offset="60%" stop-color="#c2410c" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#06040a" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- Glow Filter -->
-    <filter id="subtleGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="3" result="blur"/>
+    <!-- Candle Glow Filter -->
+    <filter id="candleGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3.5" result="blur"/>
       <feMerge>
         <feMergeNode in="blur"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
+
+    <!-- Soft Glow Filter -->
+    <filter id="headerGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Spiderweb Reusable Template -->
+    <g id="spiderWeb">
+      <!-- Radial Web Strands -->
+      <line x1="0" y1="0" x2="150" y2="0" stroke="#f97316" stroke-width="0.7" opacity="0.35"/>
+      <line x1="0" y1="0" x2="140" y2="35" stroke="#f97316" stroke-width="0.7" opacity="0.35"/>
+      <line x1="0" y1="0" x2="115" y2="75" stroke="#f97316" stroke-width="0.7" opacity="0.35"/>
+      <line x1="0" y1="0" x2="75" y2="115" stroke="#f97316" stroke-width="0.7" opacity="0.35"/>
+      <line x1="0" y1="0" x2="35" y2="140" stroke="#f97316" stroke-width="0.7" opacity="0.35"/>
+      <line x1="0" y1="0" x2="0" y2="150" stroke="#f97316" stroke-width="0.7" opacity="0.35"/>
+      <!-- Concentric Sagging Arcs -->
+      <path d="M28,0 Q26,8 24,10 Q20,17 15,22 Q10,26 6,28 L0,28" fill="none" stroke="#fed7aa" stroke-width="0.8" opacity="0.45"/>
+      <path d="M58,0 Q53,16 48,20 Q40,34 30,44 Q20,52 12,56 L0,58" fill="none" stroke="#fed7aa" stroke-width="0.8" opacity="0.45"/>
+      <path d="M92,0 Q84,26 76,32 Q64,54 48,70 Q32,82 19,89 L0,92" fill="none" stroke="#fed7aa" stroke-width="0.8" opacity="0.45"/>
+      <path d="M132,0 Q121,37 110,46 Q92,77 69,100 Q46,117 27,127 L0,132" fill="none" stroke="#fed7aa" stroke-width="0.8" opacity="0.45"/>
+    </g>
+
+    <!-- Reusable Carved Jack-O'-Lantern Pumpkin -->
+    <g id="jackPumpkin">
+      <!-- Pumpkin Ribs / Body -->
+      <ellipse cx="0" cy="0" rx="28" ry="24" fill="#9a3412"/>
+      <ellipse cx="-14" cy="0" rx="18" ry="23" fill="#c2410c"/>
+      <ellipse cx="14" cy="0" rx="18" ry="23" fill="#c2410c"/>
+      <ellipse cx="-7" cy="0" rx="15" ry="23.5" fill="#ea580c"/>
+      <ellipse cx="7" cy="0" rx="15" ry="23.5" fill="#ea580c"/>
+      <ellipse cx="0" cy="0" rx="12" ry="24" fill="#f97316"/>
+      <!-- Vine Stem -->
+      <path d="M-2,-22 Q-4,-30 4,-33 Q3,-26 2,-22 Z" fill="#65a30d" stroke="#365314" stroke-width="0.5"/>
+      <!-- Carved Fiery Eyes -->
+      <polygon points="-13,-8 -4,-6 -9,0" fill="#fef08a" filter="url(#candleGlow)"/>
+      <polygon points="13,-8 4,-6 9,0" fill="#fef08a" filter="url(#candleGlow)"/>
+      <!-- Carved Nose -->
+      <polygon points="0,-3 -4,3 4,3" fill="#fef08a" filter="url(#candleGlow)"/>
+      <!-- Jagged Sawtooth Grin -->
+      <path d="M-18,7 L-13,6 L-10,11 L-5,7 L0,11 L5,7 L10,11 L13,6 L18,7 Q14,18 0,18 Q-14,18 -18,7 Z" fill="#fef08a" filter="url(#candleGlow)"/>
+    </g>
+
+    <!-- Reusable Bat Silhouette -->
+    <g id="batSilhouette">
+      <path d="M0,0 Q6,-11 18,-9 Q12,-1 15,4 Q8,2 4,8 Q1,2 0,0 Q-1,2 -4,8 Q-8,2 -15,4 Q-12,-1 -18,-9 Q-6,-11 0,0 Z" fill="#ff7a1a" opacity="0.85"/>
+      <circle cx="-1" cy="0" r="1.5" fill="#fef08a"/>
+      <circle cx="1" cy="0" r="1.5" fill="#fef08a"/>
+    </g>
   </defs>
 
-  <!-- 1. Background Fill & Atmospheric Glows -->
+  <!-- 1. Deep Space & Atmospheric Background -->
   <rect width="1120" height="792" fill="url(#bgGlow)"/>
   <rect width="1120" height="792" fill="url(#purpleNebula)"/>
   <rect width="1120" height="792" fill="url(#orangeNebula)"/>
 
-  <!-- Watermark: Subtle Jack-O-Lantern & Constellation in Background Center -->
-  <g opacity="0.04" transform="translate(460, 270) scale(1.4)">
-    <circle cx="70" cy="70" r="65" fill="#ff7a1a"/>
-    <path d="M40 55 L55 35 L70 55 Z M70 55 L85 35 L100 55 Z" fill="#000"/>
-    <polygon points="70,65 62,80 78,80" fill="#000"/>
-    <path d="M35 90 Q70 120 105 90 Q90 105 70 105 Q50 105 35 90 Z" fill="#000"/>
-    <path d="M66 5 Q70 -10 82 -12 Q78 -5 74 5 Z" fill="#ff7a1a"/>
+  <!-- 2. Atmospheric Blood Harvest Moon (Top-Left Background) -->
+  <circle cx="170" cy="130" r="110" fill="url(#moonFog)"/>
+  <circle cx="170" cy="130" r="52" fill="url(#moonGlow)" opacity="0.9" filter="url(#candleGlow)"/>
+  <!-- Moon Craters & Shadow Detail -->
+  <ellipse cx="155" cy="118" rx="8" ry="6" fill="#ea580c" opacity="0.35"/>
+  <ellipse cx="182" cy="138" rx="11" ry="8" fill="#ea580c" opacity="0.3"/>
+  <ellipse cx="162" cy="150" rx="6" ry="5" fill="#ea580c" opacity="0.25"/>
+
+  <!-- 3. Flocks of Flying Halloween Bats Across the Sky -->
+  <use href="#batSilhouette" transform="translate(245, 95) scale(1.3) rotate(-15)"/>
+  <use href="#batSilhouette" transform="translate(195, 62) scale(0.9) rotate(8)"/>
+  <use href="#batSilhouette" transform="translate(310, 115) scale(1.0) rotate(-22)"/>
+  <use href="#batSilhouette" transform="translate(130, 85) scale(0.7) rotate(20)"/>
+  <use href="#batSilhouette" transform="translate(370, 75) scale(0.8) rotate(-10)"/>
+
+  <!-- Right Sky Bats -->
+  <use href="#batSilhouette" transform="translate(850, 90) scale(1.2) rotate(15)"/>
+  <use href="#batSilhouette" transform="translate(920, 68) scale(0.85) rotate(-12)"/>
+  <use href="#batSilhouette" transform="translate(980, 105) scale(0.95) rotate(18)"/>
+  <use href="#batSilhouette" transform="translate(790, 80) scale(0.7) rotate(-20)"/>
+
+  <!-- 4. Gnarled Spooky Graveyard & Haunted Trees Silhouette along Bottom Edge -->
+  <g fill="#07040c" opacity="0.35">
+    <!-- Left Haunted Tree Branches -->
+    <path d="M40,760 C60,720 70,680 85,650 C95,670 110,660 120,640 C110,655 100,670 95,685 C115,670 135,665 150,650 C140,665 125,675 110,690 C125,710 145,730 160,760 Z"/>
+    <path d="M60,760 C75,700 90,660 100,630 C105,620 115,615 125,610 C115,620 110,630 105,645 C120,640 130,635 140,625 C130,640 120,650 110,660 Z"/>
+    <!-- Right Haunted Tree Branches -->
+    <path d="M1080,760 C1060,720 1050,680 1035,650 C1025,670 1010,660 1000,640 C1010,655 1020,670 1025,685 C1005,670 985,665 970,650 C980,665 995,675 1010,690 C995,710 975,730 960,760 Z"/>
+    <!-- Distant Tombstones along the bottom mist -->
+    <rect x="220" y="738" width="16" height="24" rx="8" fill="#140b1e" opacity="0.4"/>
+    <rect x="290" y="742" width="14" height="20" rx="7" fill="#140b1e" opacity="0.35"/>
+    <rect x="830" y="740" width="15" height="22" rx="7" fill="#140b1e" opacity="0.35"/>
+    <rect x="895" y="736" width="17" height="26" rx="8" fill="#140b1e" opacity="0.4"/>
   </g>
 
-  <!-- 2. Outer Ornate Border -->
-  <rect x="28" y="28" width="1064" height="736" rx="8" fill="none" stroke="url(#borderGrad)" stroke-width="2.5" opacity="0.85"/>
-  <rect x="36" y="36" width="1048" height="720" rx="6" fill="none" stroke="#ff7a1a" stroke-width="0.75" stroke-dasharray="4, 4" opacity="0.4"/>
-  <rect x="46" y="46" width="1028" height="700" rx="4" fill="none" stroke="url(#borderGrad)" stroke-width="1.2" opacity="0.65"/>
-
-  <!-- Corner Flourishes (Top-Left, Top-Right, Bottom-Left, Bottom-Right) -->
-  <!-- Top-Left -->
-  <g transform="translate(28, 28)" stroke="url(#goldGrad)" fill="none" stroke-width="1.5">
-    <path d="M0,40 L0,12 Q0,0 12,0 L40,0"/>
-    <circle cx="16" cy="16" r="3" fill="#ff9a3c"/>
-    <path d="M6,6 L26,26"/>
-    <path d="M0,24 Q24,24 24,0"/>
-  </g>
-  <!-- Top-Right -->
-  <g transform="translate(1092, 28) scale(-1, 1)" stroke="url(#goldGrad)" fill="none" stroke-width="1.5">
-    <path d="M0,40 L0,12 Q0,0 12,0 L40,0"/>
-    <circle cx="16" cy="16" r="3" fill="#ff9a3c"/>
-    <path d="M6,6 L26,26"/>
-    <path d="M0,24 Q24,24 24,0"/>
-  </g>
-  <!-- Bottom-Left -->
-  <g transform="translate(28, 764) scale(1, -1)" stroke="url(#goldGrad)" fill="none" stroke-width="1.5">
-    <path d="M0,40 L0,12 Q0,0 12,0 L40,0"/>
-    <circle cx="16" cy="16" r="3" fill="#ff9a3c"/>
-    <path d="M6,6 L26,26"/>
-    <path d="M0,24 Q24,24 24,0"/>
-  </g>
-  <!-- Bottom-Right -->
-  <g transform="translate(1092, 764) scale(-1, -1)" stroke="url(#goldGrad)" fill="none" stroke-width="1.5">
-    <path d="M0,40 L0,12 Q0,0 12,0 L40,0"/>
-    <circle cx="16" cy="16" r="3" fill="#ff9a3c"/>
-    <path d="M6,6 L26,26"/>
-    <path d="M0,24 Q24,24 24,0"/>
+  <!-- 5. Floating Glowing Embers / Firefly Sparks -->
+  <g opacity="0.75">
+    <circle cx="180" cy="460" r="2.0" fill="#fde047" filter="url(#candleGlow)"/>
+    <circle cx="230" cy="380" r="2.5" fill="#ff7a1a" filter="url(#candleGlow)"/>
+    <circle cx="280" cy="520" r="1.5" fill="#fde047"/>
+    <circle cx="340" cy="320" r="2.0" fill="#f97316" filter="url(#candleGlow)"/>
+    <circle cx="780" cy="480" r="2.0" fill="#fde047" filter="url(#candleGlow)"/>
+    <circle cx="840" cy="360" r="2.5" fill="#ff7a1a" filter="url(#candleGlow)"/>
+    <circle cx="890" cy="530" r="1.5" fill="#fde047"/>
+    <circle cx="940" cy="420" r="2.2" fill="#f97316" filter="url(#candleGlow)"/>
   </g>
 
-  <!-- 3. Top Organization & Event Banner -->
-  <g transform="translate(560, 95)" text-anchor="middle">
-    <!-- Mini Brand Crest -->
+  <!-- 6. Prominent Center Watermark: Carved Glowing Jack-O'-Lantern Face -->
+  <g opacity="0.14" transform="translate(560, 420)">
+    <!-- Pumpkin Outer Contour -->
+    <ellipse cx="0" cy="0" rx="140" ry="118" fill="url(#goldGrad)"/>
+    <!-- Glowing Sinister Eyes -->
+    <polygon points="-75,-35 -20,-28 -48,0" fill="#fff59d"/>
+    <polygon points="75,-35 20,-28 48,0" fill="#fff59d"/>
+    <!-- Nose -->
+    <polygon points="0,-12 -18,14 18,14" fill="#fff59d"/>
+    <!-- Wide Sawtooth Grin -->
+    <path d="M-90,32 L-65,28 L-52,48 L-30,30 L-10,48 L10,48 L30,30 L52,48 L65,28 L90,32 Q70,82 0,82 Q-70,82 -90,32 Z" fill="#fff59d"/>
+  </g>
+
+  <!-- 7. Ornate Gothic Borders with Spiderwebs in 4 Corners -->
+  <!-- Outer Double Line Border -->
+  <rect x="26" y="26" width="1068" height="740" rx="10" fill="none" stroke="url(#borderGrad)" stroke-width="2.5" opacity="0.9"/>
+  <rect x="34" y="34" width="1052" height="724" rx="7" fill="none" stroke="#ff7a1a" stroke-width="0.8" stroke-dasharray="5, 4" opacity="0.5"/>
+  <rect x="44" y="44" width="1032" height="704" rx="5" fill="none" stroke="url(#borderGrad)" stroke-width="1.2" opacity="0.75"/>
+
+  <!-- Spiderwebs (Top-Left, Top-Right, Bottom-Left, Bottom-Right) -->
+  <!-- Top-Left Spiderweb -->
+  <use href="#spiderWeb" transform="translate(26, 26)"/>
+  <!-- Dangling Spider from Top-Left Web -->
+  <g transform="translate(108, 98)">
+    <line x1="0" y1="-72" x2="0" y2="0" stroke="#f97316" stroke-width="0.6" stroke-dasharray="2, 2" opacity="0.6"/>
+    <!-- Spider Body & Head -->
+    <ellipse cx="0" cy="0" rx="3.5" ry="4.5" fill="#ea580c"/>
+    <circle cx="0" cy="-3.5" r="2.2" fill="#c2410c"/>
+    <!-- Spider Legs -->
+    <path d="M-3,-1 Q-9,-4 -11,0 M-3,1 Q-9,1 -11,5 M-3,3 Q-8,6 -9,10" fill="none" stroke="#ea580c" stroke-width="0.8"/>
+    <path d="M3,-1 Q9,-4 11,0 M3,1 Q9,1 11,5 M3,3 Q8,6 9,10" fill="none" stroke="#ea580c" stroke-width="0.8"/>
+  </g>
+
+  <!-- Top-Right Spiderweb (Mirrored) -->
+  <use href="#spiderWeb" transform="translate(1094, 26) scale(-1, 1)"/>
+  <!-- Bottom-Left Spiderweb (Mirrored vertically) -->
+  <use href="#spiderWeb" transform="translate(26, 766) scale(1, -0.85)"/>
+  <!-- Bottom-Right Spiderweb (Mirrored both) -->
+  <use href="#spiderWeb" transform="translate(1094, 766) scale(-1, -0.85)"/>
+
+  <!-- Ornate Corner Flame Brackets -->
+  <g stroke="url(#goldGrad)" fill="none" stroke-width="1.8">
+    <path d="M26,70 L26,40 Q26,26 40,26 L70,26"/>
+    <path d="M1094,70 L1094,40 Q1094,26 1080,26 L1050,26"/>
+    <path d="M26,722 L26,752 Q26,766 40,766 L70,766"/>
+    <path d="M1094,722 L1094,752 Q1094,766 1080,766 L1050,766"/>
+  </g>
+
+  <!-- 8. Top Event Banner with Carved Pumpkins Flanking Crest -->
+  <g transform="translate(560, 92)" text-anchor="middle">
+    <!-- Left Carved Pumpkin -->
+    <use href="#jackPumpkin" transform="translate(-175, 5) scale(0.72)"/>
+
+    <!-- Central Gothic Crest -->
     <g transform="translate(0, 0)">
-      <circle cx="0" cy="0" r="18" fill="#140f1c" stroke="#ff7a1a" stroke-width="1.5"/>
-      <text x="0" y="6" font-size="14" font-weight="900" fill="#ff7a1a" font-family="'Cinzel', Georgia, serif">&#123;V&#125;</text>
+      <circle cx="0" cy="0" r="22" fill="#140a20" stroke="url(#goldGrad)" stroke-width="1.8" filter="url(#candleGlow)"/>
+      <circle cx="0" cy="0" r="18" fill="none" stroke="#ff7a1a" stroke-width="0.75" stroke-dasharray="3, 2"/>
+      <text x="0" y="7" font-size="16" font-weight="900" fill="#ff9a3c" font-family="'Cinzel', Georgia, serif">&#123;V&#125;</text>
     </g>
 
+    <!-- Right Carved Pumpkin -->
+    <use href="#jackPumpkin" transform="translate(175, 5) scale(0.72) scale(-1, 1)"/>
+
     <!-- Subtitle Banner -->
-    <text x="0" y="32" font-size="11" font-weight="700" fill="#d89e68" letter-spacing="4" text-transform="uppercase">
-      VULCAN CLUB &amp; MIRAI SCHOOL OF TECHNOLOGY
+    <text x="0" y="36" font-size="11.5" font-weight="800" fill="#fde047" letter-spacing="4" text-transform="uppercase" filter="url(#candleGlow)">
+      ✦ VULCAN CLUB × MIRAI SCHOOL OF TECHNOLOGY ✦
     </text>
-    <text x="0" y="48" font-size="9" font-weight="600" fill="#8c7a9c" letter-spacing="2" text-transform="uppercase">
-      OCTOBER 31 – NOVEMBER 1, 2026 • BENGALURU
+    <text x="0" y="52" font-size="9" font-weight="600" fill="#a855f7" letter-spacing="2" text-transform="uppercase">
+      ANNUAL HALLOWEEN HACKATHON • OCTOBER 31 – NOVEMBER 1, 2026
     </text>
   </g>
 
-  <!-- 4. Certificate Header -->
+  <!-- 9. Certificate Header Title -->
   <g transform="translate(560, 200)" text-anchor="middle">
-    <text x="0" y="0" font-size="34" font-weight="900" fill="url(#goldGrad)" letter-spacing="6" filter="url(#subtleGlow)">
+    <text x="0" y="0" font-size="35" font-weight="900" fill="url(#goldGrad)" letter-spacing="6" filter="url(#headerGlow)" font-family="'Cinzel', Georgia, serif">
       CERTIFICATE OF PARTICIPATION
     </text>
-    <line x1="-160" y1="16" x2="160" y2="16" stroke="url(#goldGrad)" stroke-width="1.2" opacity="0.8"/>
-    <circle cx="0" cy="16" r="4" fill="#ff9a3c"/>
-    <circle cx="-160" cy="16" r="2.5" fill="#ff7a1a"/>
-    <circle cx="160" cy="16" r="2.5" fill="#ff7a1a"/>
+    <!-- Gothic Center Divider with Bats & Flames -->
+    <line x1="-180" y1="18" x2="-25" y2="18" stroke="url(#goldGrad)" stroke-width="1.5" opacity="0.85"/>
+    <use href="#batSilhouette" transform="translate(0, 18) scale(0.65)"/>
+    <line x1="25" y1="18" x2="180" y2="18" stroke="url(#goldGrad)" stroke-width="1.5" opacity="0.85"/>
+    <circle cx="-180" cy="18" r="3" fill="#ff7a1a"/>
+    <circle cx="180" cy="18" r="3" fill="#ff7a1a"/>
   </g>
 
-  <!-- 5. Conferred Upon Section -->
-  <g transform="translate(560, 260)" text-anchor="middle">
-    <text x="0" y="0" font-size="12" font-weight="500" fill="#a595b3" letter-spacing="3" text-transform="uppercase">
-      THIS IS PROUDLY PRESENTED TO
+  <!-- 10. Conferred Upon Section -->
+  <g transform="translate(560, 266)" text-anchor="middle">
+    <text x="0" y="0" font-size="12" font-weight="700" fill="#c084fc" letter-spacing="3" text-transform="uppercase">
+      THIS IS PROUDLY CONFERRED UPON
     </text>
 
-    <!-- Recipient Name (Highlight) -->
-    <text x="0" y="52" font-size="36" font-weight="800" fill="#ffffff" letter-spacing="1.5" font-family="'Cinzel', 'Georgia', serif">
+    <!-- Recipient Name (Bold, Majestic, High-Contrast) -->
+    <text x="0" y="54" font-size="38" font-weight="900" fill="#ffffff" letter-spacing="2" font-family="'Cinzel', 'Georgia', serif" filter="url(#headerGlow)">
       ${name}
     </text>
 
-    <!-- Recipient Underline Accent -->
-    <path d="M-180,68 Q0,76 180,68" stroke="url(#goldGrad)" stroke-width="1.5" fill="none" opacity="0.9"/>
+    <!-- Recipient Underline Accent with Glowing Core -->
+    <path d="M-220,70 Q0,80 220,70" stroke="url(#goldGrad)" stroke-width="2" fill="none" opacity="0.95"/>
+    <circle cx="0" cy="75" r="3.5" fill="#fef08a" filter="url(#candleGlow)"/>
 
     <!-- College Name -->
-    <text x="0" y="94" font-size="15" font-weight="600" fill="#e8cfa6" letter-spacing="1">
+    <text x="0" y="100" font-size="16" font-weight="700" fill="#fed7aa" letter-spacing="1">
       ${college}
     </text>
   </g>
 
-  <!-- 6. Citation / Achievement Statement -->
-  <g transform="translate(560, 410)" text-anchor="middle">
-    <text x="0" y="0" font-size="13" font-weight="400" fill="#cfc2db" letter-spacing="0.5">
-      for actively participating and demonstrating technical ingenuity, collaboration, and endurance
+  <!-- 11. Citation / Achievement Statement -->
+  <g transform="translate(560, 420)" text-anchor="middle">
+    <text x="0" y="0" font-size="13.5" font-weight="400" fill="#e9d5ff" letter-spacing="0.5">
+      for actively competing and demonstrating exceptional engineering rigor, creativity, and nocturnal endurance
     </text>
-    <text x="0" y="24" font-size="13" font-weight="400" fill="#cfc2db" letter-spacing="0.5">
-      in the 16-Hour Overnight Halloween Hackathon
+    <text x="0" y="24" font-size="13.5" font-weight="400" fill="#e9d5ff" letter-spacing="0.5">
+      during the 16-Hour Overnight Flagship Hackathon
     </text>
 
-    <!-- Event Title Glow -->
-    <text x="0" y="60" font-size="22" font-weight="900" fill="url(#goldGrad)" letter-spacing="3">
-      HACK-O-LANTERN 2026
+    <!-- Event Title Glow with Sinister Font Styling -->
+    <text x="0" y="62" font-size="24" font-weight="900" fill="url(#goldGrad)" letter-spacing="3.5" filter="url(#candleGlow)">
+      🎃 HACK-O-LANTERN 2026 🎃
     </text>
 
     <!-- Team & Track Details Pill -->
-    <g transform="translate(0, 95)">
-      <rect x="-260" y="-18" width="520" height="36" rx="18" fill="#150f21" stroke="#ff7a1a" stroke-width="1" opacity="0.8"/>
-      <text x="0" y="5" font-size="12" font-weight="700" fill="#ffffff" letter-spacing="0.5">
-        Team: <tspan fill="#ff9a3c">${team}</tspan> • <tspan fill="#d4c0e2">${tid}</tspan>
+    <g transform="translate(0, 98)">
+      <rect x="-270" y="-18" width="540" height="36" rx="18" fill="#140a20" stroke="url(#borderGrad)" stroke-width="1.2" opacity="0.95"/>
+      <text x="0" y="5" font-size="12.5" font-weight="700" fill="#ffffff" letter-spacing="0.5">
+        Team: <tspan fill="#ff9a3c">${team}</tspan> • <tspan fill="#fed7aa">${tid}</tspan> • <tspan fill="#c084fc">${track}</tspan>
       </text>
     </g>
   </g>
 
-  <!-- 7. Footer: Official Holographic Verification Seal & Dynamic QR Code (No signatures) -->
-  <!-- Flanking Ornamental Accent Lines -->
-  <line x1="180" y1="630" x2="470" y2="630" stroke="url(#goldGrad)" stroke-width="1" opacity="0.35"/>
-  <circle cx="180" cy="630" r="2.5" fill="#f59e0b" opacity="0.6"/>
-  <line x1="650" y1="630" x2="940" y2="630" stroke="url(#goldGrad)" stroke-width="1" opacity="0.35"/>
-  <circle cx="940" cy="630" r="2.5" fill="#f59e0b" opacity="0.6"/>
+  <!-- 12. Footer: Central Holographic Talisman Seal & Dynamic QR Code -->
+  <g transform="translate(560, 638)" text-anchor="middle">
+    <!-- Flanking Carved Pumpkins Guarding the Seal -->
+    <use href="#jackPumpkin" transform="translate(-115, -4) scale(0.68)"/>
+    <use href="#jackPumpkin" transform="translate(115, -4) scale(0.68) scale(-1, 1)"/>
 
-  <!-- Center: Official Holographic Verification Seal & Dynamic QR Code -->
-  <g transform="translate(560, 630)" text-anchor="middle">
-    <!-- Outer Starburst/Rosette Seal -->
-    <circle cx="0" cy="-10" r="50" fill="#171024" stroke="url(#borderGrad)" stroke-width="2"/>
-    <circle cx="0" cy="-10" r="44" fill="none" stroke="#ff7a1a" stroke-width="0.75" stroke-dasharray="3, 2"/>
+    <!-- Flanking Decorative Chains & Lines -->
+    <line x1="-360" y1="-8" x2="-145" y2="-8" stroke="url(#goldGrad)" stroke-width="1.2" opacity="0.5"/>
+    <circle cx="-360" cy="-8" r="3" fill="#ff7a1a"/>
+    <line x1="145" y1="-8" x2="360" y2="-8" stroke="url(#goldGrad)" stroke-width="1.2" opacity="0.5"/>
+    <circle cx="360" cy="-8" r="3" fill="#ff7a1a"/>
+
+    <!-- Outer Seal Rosette / Talisman Medallion -->
+    <circle cx="0" cy="-10" r="50" fill="#140a22" stroke="url(#borderGrad)" stroke-width="2.5" filter="url(#candleGlow)"/>
+    <circle cx="0" cy="-10" r="44" fill="none" stroke="#ff7a1a" stroke-width="0.8" stroke-dasharray="4, 2"/>
 
     <!-- Seal Inner QR Code -->
     <image href="${qrDataUrl}" x="-30" y="-40" width="60" height="60"/>
 
-    <!-- Seal Ribbons -->
-    <path d="M-18,34 L-30,68 L-14,60 L2,68 L-6,34 Z" fill="#b34900" opacity="0.85"/>
-    <path d="M18,34 L6,68 L22,60 L38,68 L26,34 Z" fill="#b34900" opacity="0.85"/>
+    <!-- Seal Ribbons with Halloween Blood Orange Tone -->
+    <path d="M-18,34 L-30,68 L-14,60 L2,68 L-6,34 Z" fill="#c2410c" opacity="0.9"/>
+    <path d="M18,34 L6,68 L22,60 L38,68 L26,34 Z" fill="#c2410c" opacity="0.9"/>
 
-    <text x="0" y="48" font-size="8.5" font-weight="800" fill="#ff9a3c" letter-spacing="1.2">
+    <text x="0" y="48" font-size="8.5" font-weight="900" fill="#fde047" letter-spacing="1.5">
       OFFICIAL SEAL
     </text>
-    <text x="0" y="61" font-size="7.5" font-weight="700" fill="#8c7a9c" letter-spacing="0.5" font-family="monospace">
+    <text x="0" y="61" font-size="7.5" font-weight="700" fill="#fed7aa" letter-spacing="0.5" font-family="monospace">
       ${certId}
     </text>
   </g>
 
-  <!-- Bottom Verification Footer -->
-  <g transform="translate(560, 748)" text-anchor="middle">
-    <text x="0" y="0" font-size="8" font-weight="500" fill="#665975" letter-spacing="1">
-      VERIFIABLE CERTIFICATE • ISSUED ON ${escapeHtml(issueDate)} • VULCAN CLUB MIRAI CHAPTER
+  <!-- 13. Bottom Verification Ledger Text -->
+  <g transform="translate(560, 750)" text-anchor="middle">
+    <text x="0" y="0" font-size="8.5" font-weight="600" fill="#9382a5" letter-spacing="1.5">
+      CRYPTOGRAPHICALLY VERIFIABLE PARTICIPATION RECORD • ISSUED ON ${escapeHtml(issueDate)} • VULCAN CLUB MIRAI CHAPTER
     </text>
   </g>
 </svg>`;
+}
+
+/**
+ * Generates an ultra-crisp, high-resolution PNG Buffer (2240 x 1584 at 300 DPI) using Resvg.
+ */
+export async function generateCertificatePng(options, width = 2240) {
+  const svg = await generateCertificateSvg(options);
+  const resvg = new Resvg(svg, {
+    fitTo: { mode: 'width', value: width },
+    font: {
+      loadSystemFonts: true,
+      defaultFontFamily: 'Georgia',
+    },
+  });
+  const pngData = resvg.render();
+  return pngData.asPng();
 }
 
 /**
@@ -278,7 +432,7 @@ export function buildCertificateEmailHtml({
         VULCAN CLUB × MIRAI SCHOOL OF TECHNOLOGY
       </div>
       <h1 style="margin:0 0 8px;font-size:28px;font-weight:900;color:#ffffff;letter-spacing:1px;font-family:Georgia,serif;">
-        HACK-O-LANTERN 2026
+        🎃 HACK-O-LANTERN 2026 🎃
       </h1>
       <p style="margin:0;color:#ff9a3c;font-size:14px;font-weight:600;letter-spacing:1px;text-transform:uppercase;">
         Official Certificate of Participation
@@ -295,7 +449,7 @@ export function buildCertificateEmailHtml({
       </p>
       
       <p style="margin:0 0 24px;font-size:14px;color:#cfc5d8;line-height:1.7;">
-        In recognition of your technical skill, collaborative drive, and endurance, the Vulcan Club and Mirai School of Technology have officially conferred your verified Certificate of Participation.
+        In recognition of your technical skill, collaborative drive, and nocturnal endurance, the Vulcan Club and Mirai School of Technology have officially conferred your verified Certificate of Participation.
       </p>
 
       <!-- Certificate Summary Box -->
@@ -318,26 +472,22 @@ export function buildCertificateEmailHtml({
             <td style="padding:6px 0;text-align:right;"><code style="color:#c6f24e;font-weight:700;font-family:monospace;">${cId}</code></td>
           </tr>
           <tr>
-            <td style="padding:6px 0;color:#8f829d;">Event Dates</td>
-            <td style="padding:6px 0;text-align:right;color:#ffffff;">31 Oct – 1 Nov 2026</td>
-          </tr>
-          <tr>
-            <td style="padding:6px 0;color:#8f829d;">Venue</td>
-            <td style="padding:6px 0;text-align:right;color:#ffffff;">Mirai Floor, Bengaluru</td>
+            <td style="padding:6px 0;color:#8f829d;">Format</td>
+            <td style="padding:6px 0;text-align:right;color:#ffffff;font-weight:600;">High-Resolution PNG Attached</td>
           </tr>
         </table>
       </div>
 
       <!-- Action Button -->
       <div style="text-align:center;margin-bottom:28px;">
-        <a href="${dUrl}" target="_blank" style="display:inline-block;background:linear-gradient(135deg, #ff7a1a 0%, #e05e00 100%);color:#000000;font-weight:800;font-size:14px;padding:14px 32px;border-radius:12px;text-decoration:none;box-shadow:0 6px 20px rgba(255,122,26,0.35);">
-          📜 View &amp; Download Certificate (PDF / SVG)
+        <a href="${dUrl}&format=png" target="_blank" style="display:inline-block;background:linear-gradient(135deg, #ff7a1a 0%, #e05e00 100%);color:#000000;font-weight:800;font-size:14px;padding:14px 32px;border-radius:12px;text-decoration:none;box-shadow:0 6px 20px rgba(255,122,26,0.35);">
+          🖼️ Download High-Res Certificate (PNG)
         </a>
       </div>
 
       <div style="background:rgba(0,0,0,0.35);border-radius:12px;padding:14px;border:1px dashed rgba(255,122,26,0.25);text-align:center;">
         <p style="margin:0;font-size:12px;color:#a99cb5;">
-          Your certificate includes a cryptographic verification QR code that links to the official Vulcan verification ledger. You can add it to your LinkedIn, resume, or portfolio!
+          Your certificate includes a cryptographic verification QR code that links to the official Vulcan verification ledger. You can share your PNG directly on LinkedIn, Twitter/X, resume, or portfolio!
         </p>
       </div>
     </div>
@@ -351,4 +501,3 @@ export function buildCertificateEmailHtml({
 </body>
 </html>`;
 }
-
