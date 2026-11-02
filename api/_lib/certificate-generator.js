@@ -106,14 +106,19 @@ export async function generateCertificateSvg({
 
   <!-- 5. Top Brand Header: Vulcan Club Logo & Presents Rule -->
   <g transform="translate(560, 68)" text-anchor="middle">
-    <!-- Vulcan {V} mark -->
-    <path d="M-24,-13 Q-16,-13 -16,-3 Q-16,0 -12,0 Q-16,0 -16,3 Q-16,13 -24,13" fill="none" stroke="#1A1A1A" stroke-width="2.4"/>
-    <circle cx="-18" cy="-6" r="1.6" fill="#FF521B"/>
-    <circle cx="-18" cy="6" r="1.6" fill="#FF521B"/>
-    <path d="M-8,-11 L0,11 L8,-11" fill="none" stroke="#1A1A1A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M24,-13 Q16,-13 16,-3 Q16,0 12,0 Q16,0 16,3 Q16,13 24,13" fill="none" stroke="#1A1A1A" stroke-width="2.4"/>
-    <circle cx="18" cy="-6" r="1.6" fill="#FF521B"/>
-    <circle cx="18" cy="6" r="1.6" fill="#FF521B"/>
+    <!-- Vulcan {V} mark: Opening brace { on left, V in center, Closing brace } on right -->
+    <!-- Left Opening Brace { -->
+    <path d="M-13,-13 Q-20,-13 -20,-5 Q-20,-1 -24,0 Q-20,1 -20,5 Q-20,13 -13,13" fill="none" stroke="#1A1A1A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="-16" cy="-6" r="1.6" fill="#FF521B"/>
+    <circle cx="-16" cy="6" r="1.6" fill="#FF521B"/>
+
+    <!-- Center V -->
+    <path d="M-7,-10 L0,10 L7,-10" fill="none" stroke="#1A1A1A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Right Closing Brace } -->
+    <path d="M13,-13 Q20,-13 20,-5 Q20,-1 24,0 Q20,1 20,5 Q20,13 13,13" fill="none" stroke="#1A1A1A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="16" cy="-6" r="1.6" fill="#FF521B"/>
+    <circle cx="16" cy="6" r="1.6" fill="#FF521B"/>
 
     <text x="0" y="28" font-family="'Montserrat', -apple-system, sans-serif" font-size="13" font-weight="800" fill="#1A1A1A" letter-spacing="1.5">vulcan club</text>
   </g>
