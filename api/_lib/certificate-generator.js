@@ -1,5 +1,14 @@
 import QRCode from 'qrcode';
 import { Resvg } from '@resvg/resvg-js';
+import {
+  JP_KATAKANA_PATH,
+  PRESENTS_DIVIDER_PATH,
+  CERTIFICATE_TITLE_PATH,
+  OF_PARTICIPATION_PATH,
+  HACK_LANTERN_PATH,
+  SUBTITLE_PATH,
+  PRESENTED_TO_SCRIPT_PATH,
+} from './certificate-paths.js';
 
 function escapeHtml(value) {
   return String(value || '').replace(/[&<>"']/g, (c) => ({
@@ -92,20 +101,10 @@ export async function generateCertificateSvg({
     <polygon points="-8,-8 0,-4 8,-8 4,0 8,8 0,4 -8,8 -4,0"/>
   </g>
 
-  <!-- 4. Left Margin Vertical Japanese Katakana: ハッカーのランタン -->
-  <g fill="#FF7A50" font-family="'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Noto Sans JP', sans-serif" font-size="14.5" font-weight="700" text-anchor="middle">
-    <text x="58" y="78">ハ</text>
-    <text x="58" y="106">ッ</text>
-    <text x="58" y="134">カ</text>
-    <text x="58" y="162">ー</text>
-    <text x="58" y="190">の</text>
-    <text x="58" y="218">ラ</text>
-    <text x="58" y="246">ン</text>
-    <text x="58" y="274">タ</text>
-    <text x="58" y="302">ン</text>
-  </g>
+  <!-- 4. Left Margin Vertical Japanese Katakana: ハッカーのランタン (EXACT VECTOR PATH) -->
+  <path d="${JP_KATAKANA_PATH}" fill="#FF7A50"/>
 
-  <!-- 5. Top Brand Header: Pure Vector Official Vulcan Club Logo & Presents Rule -->
+  <!-- 5. Top Brand Header: Pure Vector Official Vulcan Club Logo -->
   <g transform="translate(560, 68) scale(0.33) translate(-205, -120)">
     <!-- Left Angular Brace { -->
     <g fill="#1A1A1A">
@@ -135,53 +134,35 @@ export async function generateCertificateSvg({
     <text x="204" y="242" font-family="'Montserrat', 'Inter', -apple-system, sans-serif" font-size="34" font-weight="800" fill="#1A1A1A" letter-spacing="0.5" text-anchor="middle">vulcan club</text>
   </g>
 
-  <!-- Presents Divider Rule -->
-  <g transform="translate(560, 137)" text-anchor="middle">
-    <line x1="-260" y1="-4" x2="-175" y2="-4" stroke="#1A1A1A" stroke-width="1"/>
-    <text x="0" y="0" font-family="'Montserrat', 'Inter', -apple-system, sans-serif" font-size="9.5" font-weight="600" fill="#1A1A1A" letter-spacing="3.5">MIRAI SCHOOL OF TECHNOLOGY PRESENTS</text>
-    <line x1="175" y1="-4" x2="260" y2="-4" stroke="#1A1A1A" stroke-width="1"/>
+  <!-- Presents Divider Rule (EXACT VECTOR PATH) -->
+  <path d="${PRESENTS_DIVIDER_PATH}" fill="#1A1A1A"/>
+
+  <!-- 6. Main Certificate Title: CERTIFICATE OF PARTICIPATION (EXACT VECTOR PATHS) -->
+  <path d="${CERTIFICATE_TITLE_PATH}" fill="#1A1A1A"/>
+  <path d="${OF_PARTICIPATION_PATH}" fill="#EF541E"/>
+
+  <!-- 7. Event Title: HACK- 🎃 -LANTERN (EXACT VECTOR PATHS) -->
+  <path d="${HACK_LANTERN_PATH}" fill="#1A1A1A"/>
+  <!-- Jack-o'-Lantern Pumpkin at Center -->
+  <g transform="translate(560, 302)">
+    <ellipse cx="0" cy="0" rx="15" ry="13" fill="#EF541E"/>
+    <ellipse cx="-7.5" cy="0" rx="9" ry="12.5" fill="#F0602D"/>
+    <ellipse cx="7.5" cy="0" rx="9" ry="12.5" fill="#F0602D"/>
+    <ellipse cx="0" cy="0" rx="6.5" ry="13" fill="#F47545"/>
+    <!-- Stem -->
+    <path d="M-1,-11 Q-2,-17 3,-18 Q2,-13 1,-11 Z" fill="#65a30d"/>
+    <!-- Carved Eyes -->
+    <polygon points="-7,-4 -2,-3 -5,1" fill="#1A1A1A"/>
+    <polygon points="7,-4 2,-3 5,1" fill="#1A1A1A"/>
+    <!-- Nose -->
+    <polygon points="0,-1 -2,2 2,2" fill="#1A1A1A"/>
+    <!-- Sawtooth Smile -->
+    <path d="M-9,5 L-6,4 L-4,7 L-2,4 L0,7 L2,4 L4,7 L6,4 L9,5 Q6,11 0,11 Q-6,11 -9,5 Z" fill="#1A1A1A"/>
   </g>
+  <path d="${SUBTITLE_PATH}" fill="#1A1A1A"/>
 
-  <!-- 6. Main Certificate Title: CERTIFICATE OF PARTICIPATION -->
-  <g transform="translate(560, 215)" text-anchor="middle">
-    <text x="0" y="0" font-family="'Playfair Display', 'Didot', 'Bodoni 72', 'Cinzel', 'Georgia', serif" font-size="58" font-weight="900" fill="#1A1A1A" letter-spacing="1.5">CERTIFICATE</text>
-    <!-- OF PARTICIPATION with flanking orange lines -->
-    <line x1="-185" y1="30" x2="-125" y2="30" stroke="#EF541E" stroke-width="1.8"/>
-    <text x="0" y="35" font-family="'Montserrat', 'Inter', -apple-system, sans-serif" font-size="11.5" font-weight="800" fill="#EF541E" letter-spacing="5">OF PARTICIPATION</text>
-    <line x1="125" y1="30" x2="185" y2="30" stroke="#EF541E" stroke-width="1.8"/>
-  </g>
-
-  <!-- 7. Event Title: HACK- 🎃 -LANTERN -->
-  <g transform="translate(560, 312)" text-anchor="middle">
-    <text x="-26" y="0" font-family="'Playfair Display', 'Cinzel', 'Georgia', serif" font-size="33" font-weight="900" fill="#1A1A1A" letter-spacing="2" text-anchor="end">HACK-</text>
-    
-    <!-- Jack-o'-Lantern Pumpkin at Center -->
-    <g transform="translate(0, -10)">
-      <ellipse cx="0" cy="0" rx="15" ry="13" fill="#EF541E"/>
-      <ellipse cx="-7.5" cy="0" rx="9" ry="12.5" fill="#F0602D"/>
-      <ellipse cx="7.5" cy="0" rx="9" ry="12.5" fill="#F0602D"/>
-      <ellipse cx="0" cy="0" rx="6.5" ry="13" fill="#F47545"/>
-      <!-- Stem -->
-      <path d="M-1,-11 Q-2,-17 3,-18 Q2,-13 1,-11 Z" fill="#65a30d"/>
-      <!-- Carved Eyes -->
-      <polygon points="-7,-4 -2,-3 -5,1" fill="#1A1A1A"/>
-      <polygon points="7,-4 2,-3 5,1" fill="#1A1A1A"/>
-      <!-- Nose -->
-      <polygon points="0,-1 -2,2 2,2" fill="#1A1A1A"/>
-      <!-- Sawtooth Smile -->
-      <path d="M-9,5 L-6,4 L-4,7 L-2,4 L0,7 L2,4 L4,7 L6,4 L9,5 Q6,11 0,11 Q-6,11 -9,5 Z" fill="#1A1A1A"/>
-    </g>
-
-    <text x="26" y="0" font-family="'Playfair Display', 'Cinzel', 'Georgia', serif" font-size="33" font-weight="900" fill="#1A1A1A" letter-spacing="2" text-anchor="start">-LANTERN</text>
-
-    <!-- Subtitle -->
-    <text x="0" y="26" font-family="'Montserrat', 'Inter', -apple-system, sans-serif" font-size="10" font-weight="700" fill="#1A1A1A" letter-spacing="3.5">A HALLOWEEN OVERNIGHT HACKATHON</text>
-  </g>
-
-  <!-- 8. Presented To Cursive Line -->
-  <g transform="translate(560, 388)" text-anchor="middle">
-    <text x="0" y="0" font-family="'Caveat', 'Playball', 'SignPainter', 'Brush Script MT', cursive" font-size="26" font-weight="700" fill="#EF541E" font-style="italic">This certificate is proudly presented to</text>
-  </g>
+  <!-- 8. Presented To Cursive Line (EXACT VECTOR PATH) -->
+  <path d="${PRESENTED_TO_SCRIPT_PATH}" fill="#EF541E"/>
 
   <!-- 9. Participant Name Section -->
   <g transform="translate(560, 444)" text-anchor="middle">
