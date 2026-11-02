@@ -205,7 +205,7 @@ export default async function handler(request, response) {
         max-height: 210mm !important;
         margin: 0 !important;
         padding: 0 !important;
-        background: #07060a !important;
+        background: #FAF6EE !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
         display: block !important;
