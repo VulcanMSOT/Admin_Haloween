@@ -289,11 +289,11 @@
       🎃 HACK-O-LANTERN 2026 🎃
     </text>
 
-    <!-- Team & Track Details Pill -->
+    <!-- Team Details Pill (Team Name only, no internal Team ID) -->
     <g transform="translate(0, 98)">
-      <rect x="-270" y="-18" width="540" height="36" rx="18" fill="#140a20" stroke="url(#borderGrad)" stroke-width="1.2" opacity="0.95"/>
-      <text x="0" y="5" font-size="12.5" font-weight="700" fill="#ffffff" letter-spacing="0.5">
-        Team: <tspan fill="#ff9a3c">ZomByte</tspan> • <tspan fill="#fed7aa">VHK-1011</tspan> • <tspan fill="#c084fc">Open Innovation &amp; Systems</tspan>
+      <rect x="-220" y="-18" width="440" height="36" rx="18" fill="#140a20" stroke="url(#borderGrad)" stroke-width="1.2" opacity="0.95"/>
+      <text x="0" y="5" font-size="13" font-weight="700" fill="#ffffff" letter-spacing="0.5">
+        Team: <tspan fill="#ff9a3c">ZomByte</tspan>
       </text>
     </g>
   </g>

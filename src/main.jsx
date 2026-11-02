@@ -4516,7 +4516,7 @@ function CertificatePreviewModal({ participant, participants, onSelectParticipan
 
         <div className="cert-modal-footer">
           <div style={{ fontSize: '12px', color: '#888' }}>
-            Team: <strong style={{ color: '#fff' }}>{participant.teamName}</strong> ({participant.teamId}) • {participant.college}
+            Team: <strong style={{ color: '#fff' }}>{participant.teamName}</strong> • {participant.college}
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
