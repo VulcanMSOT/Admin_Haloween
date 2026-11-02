@@ -108,10 +108,15 @@ export default async function handler(request, response) {
       color: #fff;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       min-height: 100vh;
+      width: 100%;
+    }
+    body {
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
+      padding: 20px 24px 60px;
+      overflow-x: hidden;
     }
     .toolbar {
       position: fixed;
@@ -119,77 +124,110 @@ export default async function handler(request, response) {
       left: 50%;
       transform: translateX(-50%);
       z-index: 999;
-      background: rgba(18, 14, 25, 0.88);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 122, 26, 0.35);
+      background: rgba(18, 14, 25, 0.92);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 122, 26, 0.45);
       border-radius: 999px;
-      padding: 6px 16px;
+      padding: 7px 18px;
       display: flex;
       align-items: center;
-      gap: 12px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      gap: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
     }
     .toolbar span {
-      font-size: 12px;
+      font-size: 12.5px;
       font-family: monospace;
       color: #ff9a3c;
       font-weight: 700;
+      letter-spacing: 0.5px;
     }
     .btn {
-      padding: 6px 14px;
+      padding: 7px 16px;
       border-radius: 999px;
       border: none;
-      background: #ff7a1a;
+      background: linear-gradient(135deg, #ff7a1a 0%, #e05e00 100%);
       color: #000;
-      font-size: 12px;
-      font-weight: 700;
+      font-size: 12.5px;
+      font-weight: 800;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 6px;
       text-decoration: none;
       transition: all 150ms ease;
+      box-shadow: 0 4px 12px rgba(255, 122, 26, 0.25);
     }
     .btn:hover { background: #ffa95c; transform: translateY(-1px); }
     .btn-secondary {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.12);
       color: #fff;
+      box-shadow: none;
+      border: 1px solid rgba(255, 255, 255, 0.18);
     }
-    .btn-secondary:hover { background: rgba(255, 255, 255, 0.2); }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.22); }
     .cert-frame {
-      width: 100%;
-      max-width: 1120px;
-      margin: 80px auto 40px;
-      padding: 12px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      filter: drop-shadow(0 20px 50px rgba(0,0,0,0.8));
+      box-sizing: border-box;
+      width: min(95vw, 1320px);
+      max-width: 1320px;
+      margin: 64px auto 30px;
+      padding: 0;
+      display: block;
+      filter: drop-shadow(0 25px 60px rgba(0,0,0,0.9));
     }
     .cert-frame svg {
-      width: 100%;
-      height: auto;
-      border-radius: 12px;
-      box-shadow: 0 0 40px rgba(255, 122, 26, 0.15);
+      display: block;
+      width: 100% !important;
+      height: auto !important;
+      max-width: 100%;
+      aspect-ratio: 1120 / 792;
+      border-radius: 14px;
+      box-shadow: 0 0 50px rgba(255, 122, 26, 0.2), 0 0 0 1px rgba(255, 122, 26, 0.35);
+    }
+    @page {
+      size: A4 landscape;
+      margin: 0;
     }
     @media print {
-      body { background: transparent; }
-      .toolbar { display: none !important; }
+      html, body {
+        width: 297mm !important;
+        height: 210mm !important;
+        max-width: 297mm !important;
+        max-height: 210mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #07060a !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        display: block !important;
+        overflow: hidden !important;
+      }
+      .toolbar {
+        display: none !important;
+      }
       .cert-frame {
-        max-width: none;
-        width: 100%;
-        height: 100vh;
-        margin: 0;
-        padding: 0;
-        filter: none;
+        width: 297mm !important;
+        height: 210mm !important;
+        max-width: 297mm !important;
+        max-height: 210mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        filter: none !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        page-break-after: avoid;
       }
       .cert-frame svg {
-        border-radius: 0;
-        box-shadow: none;
-      }
-      @page {
-        size: A4 landscape;
-        margin: 0;
+        width: 297mm !important;
+        height: 210mm !important;
+        max-width: 297mm !important;
+        max-height: 210mm !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        margin: 0 !important;
       }
     }
   </style>
