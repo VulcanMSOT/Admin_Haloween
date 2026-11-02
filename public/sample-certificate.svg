@@ -1,0 +1,222 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 792" width="100%" height="100%" style="background:#07060a; font-family:'Cinzel', 'Georgia', -apple-system, serif;">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bgGlow" cx="50%" cy="45%" r="65%">
+      <stop offset="0%" stop-color="#1c1228" stop-opacity="0.9"/>
+      <stop offset="45%" stop-color="#100b18" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#07060a" stop-opacity="1"/>
+    </radialGradient>
+
+    <!-- Pumpkin Gold Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe299"/>
+      <stop offset="30%" stop-color="#ff9a3c"/>
+      <stop offset="70%" stop-color="#ff7a1a"/>
+      <stop offset="100%" stop-color="#c85600"/>
+    </linearGradient>
+
+    <!-- Metallic Border Gradient -->
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffb86c"/>
+      <stop offset="25%" stop-color="#e06000"/>
+      <stop offset="50%" stop-color="#ffe6a3"/>
+      <stop offset="75%" stop-color="#e06000"/>
+      <stop offset="100%" stop-color="#ff8e30"/>
+    </linearGradient>
+
+    <!-- Purple Nebula Accent -->
+    <radialGradient id="purpleNebula" cx="15%" cy="85%" r="35%">
+      <stop offset="0%" stop-color="#7928ca" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#07060a" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="orangeNebula" cx="85%" cy="15%" r="40%">
+      <stop offset="0%" stop-color="#ff7a1a" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#07060a" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Glow Filter -->
+    <filter id="subtleGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- 1. Background Fill & Atmospheric Glows -->
+  <rect width="1120" height="792" fill="url(#bgGlow)"/>
+  <rect width="1120" height="792" fill="url(#purpleNebula)"/>
+  <rect width="1120" height="792" fill="url(#orangeNebula)"/>
+
+  <!-- Watermark: Subtle Jack-O-Lantern & Constellation in Background Center -->
+  <g opacity="0.04" transform="translate(460, 270) scale(1.4)">
+    <circle cx="70" cy="70" r="65" fill="#ff7a1a"/>
+    <path d="M40 55 L55 35 L70 55 Z M70 55 L85 35 L100 55 Z" fill="#000"/>
+    <polygon points="70,65 62,80 78,80" fill="#000"/>
+    <path d="M35 90 Q70 120 105 90 Q90 105 70 105 Q50 105 35 90 Z" fill="#000"/>
+    <path d="M66 5 Q70 -10 82 -12 Q78 -5 74 5 Z" fill="#ff7a1a"/>
+  </g>
+
+  <!-- 2. Outer Ornate Border -->
+  <rect x="28" y="28" width="1064" height="736" rx="8" fill="none" stroke="url(#borderGrad)" stroke-width="2.5" opacity="0.85"/>
+  <rect x="36" y="36" width="1048" height="720" rx="6" fill="none" stroke="#ff7a1a" stroke-width="0.75" stroke-dasharray="4, 4" opacity="0.4"/>
+  <rect x="46" y="46" width="1028" height="700" rx="4" fill="none" stroke="url(#borderGrad)" stroke-width="1.2" opacity="0.65"/>
+
+  <!-- Corner Flourishes (Top-Left, Top-Right, Bottom-Left, Bottom-Right) -->
+  <!-- Top-Left -->
+  <g transform="translate(28, 28)" stroke="url(#goldGrad)" fill="none" stroke-width="1.5">
+    <path d="M0,40 L0,12 Q0,0 12,0 L40,0"/>
+    <circle cx="16" cy="16" r="3" fill="#ff9a3c"/>
+    <path d="M6,6 L26,26"/>
+    <path d="M0,24 Q24,24 24,0"/>
+  </g>
+  <!-- Top-Right -->
+  <g transform="translate(1092, 28) scale(-1, 1)" stroke="url(#goldGrad)" fill="none" stroke-width="1.5">
+    <path d="M0,40 L0,12 Q0,0 12,0 L40,0"/>
+    <circle cx="16" cy="16" r="3" fill="#ff9a3c"/>
+    <path d="M6,6 L26,26"/>
+    <path d="M0,24 Q24,24 24,0"/>
+  </g>
+  <!-- Bottom-Left -->
+  <g transform="translate(28, 764) scale(1, -1)" stroke="url(#goldGrad)" fill="none" stroke-width="1.5">
+    <path d="M0,40 L0,12 Q0,0 12,0 L40,0"/>
+    <circle cx="16" cy="16" r="3" fill="#ff9a3c"/>
+    <path d="M6,6 L26,26"/>
+    <path d="M0,24 Q24,24 24,0"/>
+  </g>
+  <!-- Bottom-Right -->
+  <g transform="translate(1092, 764) scale(-1, -1)" stroke="url(#goldGrad)" fill="none" stroke-width="1.5">
+    <path d="M0,40 L0,12 Q0,0 12,0 L40,0"/>
+    <circle cx="16" cy="16" r="3" fill="#ff9a3c"/>
+    <path d="M6,6 L26,26"/>
+    <path d="M0,24 Q24,24 24,0"/>
+  </g>
+
+  <!-- 3. Top Organization & Event Banner -->
+  <g transform="translate(560, 95)" text-anchor="middle">
+    <!-- Mini Brand Crest -->
+    <g transform="translate(0, 0)">
+      <circle cx="0" cy="0" r="18" fill="#140f1c" stroke="#ff7a1a" stroke-width="1.5"/>
+      <text x="0" y="6" font-size="14" font-weight="900" fill="#ff7a1a" font-family="'Cinzel', Georgia, serif">&#123;V&#125;</text>
+    </g>
+
+    <!-- Subtitle Banner -->
+    <text x="0" y="32" font-size="11" font-weight="700" fill="#d89e68" letter-spacing="4" text-transform="uppercase">
+      VULCAN CLUB &amp; MIRAI SCHOOL OF TECHNOLOGY
+    </text>
+    <text x="0" y="48" font-size="9" font-weight="600" fill="#8c7a9c" letter-spacing="2" text-transform="uppercase">
+      OCTOBER 31 – NOVEMBER 1, 2026 • BENGALURU
+    </text>
+  </g>
+
+  <!-- 4. Certificate Header -->
+  <g transform="translate(560, 200)" text-anchor="middle">
+    <text x="0" y="0" font-size="34" font-weight="900" fill="url(#goldGrad)" letter-spacing="6" filter="url(#subtleGlow)">
+      CERTIFICATE OF PARTICIPATION
+    </text>
+    <line x1="-160" y1="16" x2="160" y2="16" stroke="url(#goldGrad)" stroke-width="1.2" opacity="0.8"/>
+    <circle cx="0" cy="16" r="4" fill="#ff9a3c"/>
+    <circle cx="-160" cy="16" r="2.5" fill="#ff7a1a"/>
+    <circle cx="160" cy="16" r="2.5" fill="#ff7a1a"/>
+  </g>
+
+  <!-- 5. Conferred Upon Section -->
+  <g transform="translate(560, 260)" text-anchor="middle">
+    <text x="0" y="0" font-size="12" font-weight="500" fill="#a595b3" letter-spacing="3" text-transform="uppercase">
+      THIS IS PROUDLY PRESENTED TO
+    </text>
+
+    <!-- Recipient Name (Highlight) -->
+    <text x="0" y="52" font-size="36" font-weight="800" fill="#ffffff" letter-spacing="1.5" font-family="'Cinzel', 'Georgia', serif">
+      Raj Jasani
+    </text>
+
+    <!-- Recipient Underline Accent -->
+    <path d="M-180,68 Q0,76 180,68" stroke="url(#goldGrad)" stroke-width="1.5" fill="none" opacity="0.9"/>
+
+    <!-- College Name -->
+    <text x="0" y="94" font-size="15" font-weight="600" fill="#e8cfa6" letter-spacing="1">
+      Mirai School of Technology
+    </text>
+  </g>
+
+  <!-- 6. Citation / Achievement Statement -->
+  <g transform="translate(560, 410)" text-anchor="middle">
+    <text x="0" y="0" font-size="13" font-weight="400" fill="#cfc2db" letter-spacing="0.5">
+      for actively participating and demonstrating technical ingenuity, collaboration, and endurance
+    </text>
+    <text x="0" y="24" font-size="13" font-weight="400" fill="#cfc2db" letter-spacing="0.5">
+      in the 16-Hour Overnight Halloween Hackathon
+    </text>
+
+    <!-- Event Title Glow -->
+    <text x="0" y="60" font-size="22" font-weight="900" fill="url(#goldGrad)" letter-spacing="3">
+      HACK-O-LANTERN 2026
+    </text>
+
+    <!-- Team & Track Details Pill -->
+    <g transform="translate(0, 95)">
+      <rect x="-260" y="-18" width="520" height="36" rx="18" fill="#150f21" stroke="#ff7a1a" stroke-width="1" opacity="0.8"/>
+      <text x="0" y="5" font-size="12" font-weight="700" fill="#ffffff" letter-spacing="0.5">
+        Team: <tspan fill="#ff9a3c">ZomByte</tspan> • <tspan fill="#d4c0e2">VHK-1011</tspan>
+      </text>
+    </g>
+  </g>
+
+  <!-- 7. Footer: Signatures & Official Holographic Verification Seal -->
+  <!-- Left Signature: Lead Organizer (Sapnil Biswas) -->
+  <g transform="translate(190, 640)" text-anchor="middle">
+    <!-- Signature Graphic -->
+    <path d="M-60,0 Q-30,-25 0,-5 Q25,10 50,-15 T80,-5" fill="none" stroke="#ffa450" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
+    <line x1="-80" y1="12" x2="80" y2="12" stroke="#524363" stroke-width="1"/>
+    <text x="0" y="28" font-size="12" font-weight="800" fill="#ffffff" letter-spacing="1">
+      SAPNIL BISWAS
+    </text>
+    <text x="0" y="44" font-size="10" font-weight="600" fill="#a595b3" letter-spacing="0.5">
+      Lead Organizer, Vulcan Club
+    </text>
+  </g>
+
+  <!-- Center: Official Holographic Verification Seal & Dynamic QR Code -->
+  <g transform="translate(560, 640)" text-anchor="middle">
+    <!-- Outer Starburst/Rosette Seal -->
+    <circle cx="0" cy="-10" r="48" fill="#171024" stroke="url(#borderGrad)" stroke-width="2"/>
+    <circle cx="0" cy="-10" r="42" fill="none" stroke="#ff7a1a" stroke-width="0.75" stroke-dasharray="3, 2"/>
+
+    <!-- Seal Inner QR Code -->
+    <image href="data:image/png;base64,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" x="-28" y="-38" width="56" height="56"/>
+
+    <!-- Seal Ribbons -->
+    <path d="M-18,34 L-30,68 L-14,60 L2,68 L-6,34 Z" fill="#b34900" opacity="0.85"/>
+    <path d="M18,34 L6,68 L22,60 L38,68 L26,34 Z" fill="#b34900" opacity="0.85"/>
+
+    <text x="0" y="48" font-size="8" font-weight="800" fill="#ff9a3c" letter-spacing="1">
+      OFFICIAL SEAL
+    </text>
+    <text x="0" y="60" font-size="7.5" font-weight="700" fill="#8c7a9c" letter-spacing="0.5" font-family="monospace">
+      HOL26-PART-VHK1011-01
+    </text>
+  </g>
+
+  <!-- Right Signature: Faculty Advisor (Mirai School of Technology) -->
+  <g transform="translate(930, 640)" text-anchor="middle">
+    <!-- Signature Graphic -->
+    <path d="M-50,-5 Q-20,15 10,-20 Q35,-5 60,-12 T75,0" fill="none" stroke="#ffa450" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
+    <line x1="-80" y1="12" x2="80" y2="12" stroke="#524363" stroke-width="1"/>
+    <text x="0" y="28" font-size="12" font-weight="800" fill="#ffffff" letter-spacing="1">
+      FACULTY ADVISOR
+    </text>
+    <text x="0" y="44" font-size="10" font-weight="600" fill="#a595b3" letter-spacing="0.5">
+      Mirai School of Technology
+    </text>
+  </g>
+
+  <!-- Bottom Verification Footer -->
+  <g transform="translate(560, 748)" text-anchor="middle">
+    <text x="0" y="0" font-size="8" font-weight="500" fill="#665975" letter-spacing="1">
+      VERIFIABLE CERTIFICATE • ISSUED ON November 1, 2026 • VULCAN CLUB MIRAI CHAPTER
+    </text>
+  </g>
+</svg>

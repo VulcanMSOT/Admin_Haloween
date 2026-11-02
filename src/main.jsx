@@ -4414,6 +4414,565 @@ function ReferralsView({ onActionComplete }) {
 }
 
 // -------------------------------------------------------------
+// Participation Certificate Preview Modal
+// -------------------------------------------------------------
+function CertificatePreviewModal({ participant, participants, onSelectParticipant, onClose, onEmailSent }) {
+  const [svg, setSvg] = useState('');
+  const [loadingSvg, setLoadingSvg] = useState(true);
+  const [emailing, setEmailing] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    if (!participant) return;
+    setLoadingSvg(true);
+    setMsg('');
+    fetch(`/api/certificate-render?certId=${encodeURIComponent(participant.certificateId)}&memberId=${encodeURIComponent(participant.memberId)}&format=svg`)
+      .then((res) => res.text())
+      .then((data) => {
+        setSvg(data);
+        setLoadingSvg(false);
+      })
+      .catch((err) => {
+        setLoadingSvg(false);
+        setMsg('Error loading certificate: ' + err.message);
+      });
+  }, [participant]);
+
+  const handleSendEmail = async () => {
+    if (!confirm(`Email official certificate to ${participant.fullName} (${participant.email})?`)) return;
+    setEmailing(true);
+    setMsg('');
+    try {
+      const res = await api('certificate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_single', memberId: participant.memberId }),
+      });
+      setMsg(res.message || 'Certificate successfully emailed!');
+      if (onEmailSent) onEmailSent();
+    } catch (err) {
+      setMsg('Error: ' + err.message);
+    } finally {
+      setEmailing(false);
+    }
+  };
+
+  const downloadSvg = () => {
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${participant.certificateId}.svg`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const openPrint = () => {
+    window.open(`/api/certificate-render?certId=${encodeURIComponent(participant.certificateId)}&memberId=${encodeURIComponent(participant.memberId)}`, '_blank');
+  };
+
+  return (
+    <div className="cert-modal-backdrop" onClick={onClose}>
+      <div className="cert-modal-box" onClick={(e) => e.stopPropagation()}>
+        <div className="cert-modal-header">
+          <h3>
+            <span>📜</span> Certificate Preview · <code style={{ color: '#ff9a3c' }}>{participant.certificateId}</code>
+          </h3>
+          <button type="button" className="quiet" onClick={onClose} style={{ minHeight: '32px', padding: '0 12px' }}>
+            ✕ Close
+          </button>
+        </div>
+
+        <div className="cert-modal-body">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', color: '#b4b4b4' }}>Select Participant:</span>
+            <select
+              value={participant.memberId}
+              onChange={(e) => {
+                const found = participants.find((p) => p.memberId === e.target.value);
+                if (found && onSelectParticipant) onSelectParticipant(found);
+              }}
+            >
+              {participants.map((p) => (
+                <option key={p.memberId} value={p.memberId}>
+                  {p.fullName} ({p.teamName} · {p.teamId})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {msg && (
+            <p style={{ margin: '4px 0', fontSize: '13px', color: msg.startsWith('Error') ? '#ff9aa0' : '#c6f24e', fontWeight: 600 }}>
+              {msg}
+            </p>
+          )}
+
+          {loadingSvg ? (
+            <div style={{ padding: '80px', textAlign: 'center', color: '#aaa', fontStyle: 'italic' }}>
+              Rendering high-resolution vector certificate...
+            </div>
+          ) : (
+            <div className="cert-svg-wrap" dangerouslySetInnerHTML={{ __html: svg }} />
+          )}
+        </div>
+
+        <div className="cert-modal-footer">
+          <div style={{ fontSize: '12px', color: '#888' }}>
+            Team: <strong style={{ color: '#fff' }}>{participant.teamName}</strong> ({participant.teamId}) • {participant.college}
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button type="button" className="btn-cert-secondary" onClick={downloadSvg} disabled={!svg}>
+              ⬇️ Download SVG
+            </button>
+            <button type="button" className="btn-cert-secondary" onClick={openPrint}>
+              🖨️ Fullscreen / Print PDF
+            </button>
+            <button type="button" className="btn-cert-primary" onClick={handleSendEmail} disabled={emailing}>
+              {emailing ? 'Sending Email...' : `📧 Email to ${participant.fullName.split(' ')[0]}`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// Certificates Management View
+// -------------------------------------------------------------
+function CertificatesView({ onNavigate }) {
+  const [participants, setParticipants] = useState([]);
+  const [stats, setStats] = useState({ totalParticipants: 0, totalIssued: 0, totalEmailed: 0, totalPending: 0 });
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all'); // 'all' | 'emailed' | 'pending' | 'admitted'
+  const [loading, setLoading] = useState(true);
+  const [busyAction, setBusyAction] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [previewParticipant, setPreviewParticipant] = useState(null);
+  const [testEmailInput, setTestEmailInput] = useState('');
+  const [showTestModal, setShowTestModal] = useState(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      const res = await api(`certificates?search=${encodeURIComponent(search)}&filter=${encodeURIComponent(filter)}`);
+      setParticipants(res.participants || []);
+      setStats(res.stats || {});
+      setError('');
+    } catch (err) {
+      setError(err.message || 'Failed to load certificates');
+    } finally {
+      setLoading(false);
+    }
+  }, [search, filter]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Sync / Issue All
+  const handleSyncAll = async () => {
+    setBusyAction('Synchronizing certificate records in database...');
+    setError('');
+    setNotice('');
+    try {
+      const res = await api('certificates', { method: 'POST' });
+      setNotice(res.message);
+      await loadData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyAction('');
+    }
+  };
+
+  // Send single email
+  const handleSendSingle = async (member) => {
+    if (!confirm(`Email official certificate to ${member.fullName} (${member.email})?`)) return;
+    setBusyAction(`Sending certificate to ${member.fullName}...`);
+    setError('');
+    setNotice('');
+    try {
+      const res = await api('certificate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_single', memberId: member.memberId }),
+      });
+      setNotice(res.message);
+      await loadData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyAction('');
+    }
+  };
+
+  // Send team email
+  const handleSendTeam = async (teamId, teamName) => {
+    if (!confirm(`Email certificates to ALL members of Team ${teamName} (${teamId})?`)) return;
+    setBusyAction(`Sending certificates to Team ${teamName}...`);
+    setError('');
+    setNotice('');
+    try {
+      const res = await api('certificate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_team', teamId }),
+      });
+      setNotice(res.message);
+      await loadData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyAction('');
+    }
+  };
+
+  // Batch send all
+  const handleBatchSendAll = async (onlyAdmitted = false) => {
+    const scopeStr = onlyAdmitted ? 'admitted (checked-in)' : 'all eligible';
+    if (!confirm(`Are you sure you want to email certificates to ALL pending ${scopeStr} participants? This will queue and send emails via Resend.`)) return;
+
+    setBusyAction('Dispatching batch certificate emails...');
+    setError('');
+    setNotice('');
+    try {
+      const res = await api('certificate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send_all', onlyPending: true, onlyAdmitted }),
+      });
+      setNotice(res.message);
+      await loadData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyAction('');
+    }
+  };
+
+  // Test email
+  const handleSendTest = async (e) => {
+    e.preventDefault();
+    if (!testEmailInput.trim()) return;
+    setBusyAction('Sending sample preview email...');
+    setError('');
+    setNotice('');
+    try {
+      const res = await api('certificate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test_preview', testEmail: testEmailInput.trim() }),
+      });
+      setNotice(res.message);
+      setShowTestModal(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyAction('');
+    }
+  };
+
+  return (
+    <section className="cert-section" aria-labelledby="cert-title">
+      <div className="section-head">
+        <div>
+          <h2 id="cert-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>📜</span> Participation Certificates Desk
+          </h2>
+          <p>
+            Generate, preview, and email verified Halloween-themed certificates of participation to all teams and members.
+          </p>
+        </div>
+
+        <div className="cert-header-actions">
+          {participants.length > 0 && (
+            <button
+              type="button"
+              className="btn-cert-secondary"
+              onClick={() => setPreviewParticipant(participants[0])}
+            >
+              👁️ Preview Template
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="btn-cert-secondary"
+            onClick={() => setShowTestModal(true)}
+          >
+            🧪 Test Email to Myself
+          </button>
+
+          <button
+            type="button"
+            className="btn-cert-primary"
+            onClick={() => handleBatchSendAll(false)}
+            disabled={Boolean(busyAction) || stats.totalPending === 0}
+          >
+            📧 Batch Email All ({stats.totalPending})
+          </button>
+
+          <button
+            type="button"
+            className="quiet"
+            onClick={handleSyncAll}
+            disabled={Boolean(busyAction)}
+            title="Ensure all 99 participants have database certificate IDs registered"
+          >
+            🔄 Sync IDs
+          </button>
+        </div>
+      </div>
+
+      {busyAction && (
+        <div style={{ marginTop: '16px', padding: '12px 16px', background: 'rgba(255,122,26,0.15)', border: '1px solid #ff7a1a', borderRadius: '8px', color: '#ff9a4d', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span className="live-dot" style={{ background: '#ff7a1a' }} />
+          <span>{busyAction}</span>
+        </div>
+      )}
+
+      {error && <p className="form-error" style={{ marginTop: '16px' }}>{error}</p>}
+      {notice && <p className="form-notice" style={{ marginTop: '16px' }}>{notice}</p>}
+
+      {/* Stats Grid */}
+      <div className="dashboard-grid" style={{ marginTop: '20px' }}>
+        <div className="stat-card">
+          <span className="stat-card__label">Total Participants</span>
+          <span className="stat-card__value">{stats.totalParticipants || 0}</span>
+          <span className="stat-card__sub">Across all 33 paid teams</span>
+        </div>
+
+        <div className="stat-card">
+          <span className="stat-card__label">Certificates Issued</span>
+          <span className="stat-card__value" style={{ color: '#ff9a4d' }}>{stats.totalIssued || stats.totalParticipants || 0}</span>
+          <span className="stat-card__sub">Unique IDs generated</span>
+        </div>
+
+        <div className="stat-card">
+          <span className="stat-card__label">Emailed to Members</span>
+          <span className="stat-card__value stat-card__value--valid">{stats.totalEmailed || 0}</span>
+          <span className="stat-card__sub">Dispatched via Resend</span>
+        </div>
+
+        <div className="stat-card">
+          <span className="stat-card__label">Pending Delivery</span>
+          <span className="stat-card__value stat-card__value--warn">{stats.totalPending || 0}</span>
+          <span className="stat-card__sub">Awaiting email dispatch</span>
+        </div>
+      </div>
+
+      {/* Filter and Search Toolbar */}
+      <div className="table-tools" style={{ marginTop: '24px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={filter === 'all' ? 'is-active' : 'quiet'}
+            onClick={() => setFilter('all')}
+          >
+            All Members ({stats.totalParticipants || 0})
+          </button>
+          <button
+            type="button"
+            className={filter === 'pending' ? 'is-active' : 'quiet'}
+            onClick={() => setFilter('pending')}
+          >
+            Pending Delivery ({stats.totalPending || 0})
+          </button>
+          <button
+            type="button"
+            className={filter === 'emailed' ? 'is-active' : 'quiet'}
+            onClick={() => setFilter('emailed')}
+          >
+            Emailed ({stats.totalEmailed || 0})
+          </button>
+          <button
+            type="button"
+            className={filter === 'admitted' ? 'is-active' : 'quiet'}
+            onClick={() => setFilter('admitted')}
+          >
+            Admitted Only
+          </button>
+        </div>
+
+        <div className="search-wrap" style={{ maxWidth: '320px', marginLeft: 'auto' }}>
+          <input
+            type="search"
+            placeholder="Search member, team, college, ID..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Participants Table */}
+      <div className="table-wrap" style={{ marginTop: '16px' }}>
+        <table>
+          <thead>
+            <tr>
+              <th>Participant</th>
+              <th>Team Info</th>
+              <th>Role</th>
+              <th>Certificate ID</th>
+              <th>Delivery Status</th>
+              <th style={{ textAlign: 'right' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
+                  Loading certificate records...
+                </td>
+              </tr>
+            ) : participants.length === 0 ? (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#888' }}>
+                  No participants found matching current filter.
+                </td>
+              </tr>
+            ) : (
+              participants.map((p) => {
+                const isSent = p.emailStatus === 'sent';
+                const isFailed = p.emailStatus === 'failed';
+
+                return (
+                  <tr key={p.memberId}>
+                    <td>
+                      <strong style={{ color: '#fff' }}>{p.fullName}</strong>
+                      <span style={{ color: '#aaa', fontSize: '12px' }}>{p.email}</span>
+                      <span style={{ color: '#777', fontSize: '11px' }}>{p.college}</span>
+                    </td>
+
+                    <td>
+                      <strong style={{ color: '#ff9a4d' }}>{p.teamName}</strong>
+                      <span style={{ fontFamily: 'monospace', color: '#fff', fontSize: '11px' }}>{p.teamId}</span>
+                      {p.isAdmitted && (
+                        <span style={{ color: '#c6f24e', fontSize: '10.5px', fontWeight: 600 }}>✓ Admitted</span>
+                      )}
+                    </td>
+
+                    <td>
+                      {p.isLeader ? (
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#ff9a4d', background: 'rgba(255,122,26,0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                          Leader
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: '#888' }}>Member</span>
+                      )}
+                    </td>
+
+                    <td>
+                      <code style={{ color: '#ffbd80', fontSize: '11.5px' }}>{p.certificateId}</code>
+                    </td>
+
+                    <td>
+                      {isSent ? (
+                        <span className="cert-badge cert-badge--sent">
+                          ✓ Sent {p.emailSentAt ? new Date(p.emailSentAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}
+                        </span>
+                      ) : isFailed ? (
+                        <span className="cert-badge cert-badge--failed" title={p.emailError || ''}>
+                          ✕ Failed
+                        </span>
+                      ) : (
+                        <span className="cert-badge cert-badge--pending">
+                          Pending
+                        </span>
+                      )}
+                    </td>
+
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button
+                        type="button"
+                        className="table-action"
+                        onClick={() => setPreviewParticipant(p)}
+                        title="Preview certificate template"
+                        style={{ marginRight: '6px' }}
+                      >
+                        👁️ Preview
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`table-action ${isSent ? '' : 'btn-approve'}`}
+                        onClick={() => handleSendSingle(p)}
+                        disabled={Boolean(busyAction)}
+                        title={isSent ? 'Resend certificate email' : 'Send certificate email'}
+                        style={{ marginRight: '6px' }}
+                      >
+                        {isSent ? 'Resend' : '📧 Send'}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="table-action"
+                        onClick={() => window.open(`/api/certificate-render?certId=${encodeURIComponent(p.certificateId)}&memberId=${encodeURIComponent(p.memberId)}`, '_blank')}
+                        title="Open printable high-resolution PDF view in new tab"
+                      >
+                        🖨️
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Interactive Certificate Preview Modal */}
+      {previewParticipant && (
+        <CertificatePreviewModal
+          participant={previewParticipant}
+          participants={participants}
+          onSelectParticipant={(p) => setPreviewParticipant(p)}
+          onClose={() => setPreviewParticipant(null)}
+          onEmailSent={loadData}
+        />
+      )}
+
+      {/* Test Email Modal */}
+      {showTestModal && (
+        <div className="drawer-backdrop" onClick={() => setShowTestModal(false)}>
+          <div className="login__panel" style={{ width: 'min(100%, 460px)', margin: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 8px', color: '#fff', fontSize: '18px' }}>Send Test Certificate Email</h3>
+            <p style={{ margin: '0 0 16px', color: '#aaa', fontSize: '13px' }}>
+              Dispatch a live sample certificate to your own email to review typography, theme colors, and SVG rendering in your inbox.
+            </p>
+
+            <form onSubmit={handleSendTest}>
+              <label>
+                Your Email Address:
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. sapnilbiswas010506@gmail.com"
+                  value={testEmailInput}
+                  onChange={(e) => setTestEmailInput(e.target.value)}
+                  autoFocus
+                />
+              </label>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                <button type="button" className="quiet" onClick={() => setShowTestModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-approve" disabled={Boolean(busyAction)}>
+                  {busyAction ? 'Sending...' : 'Send Test Email'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+
+// -------------------------------------------------------------
 // Main App Component with Tabs
 // -------------------------------------------------------------
 export default function App() {
@@ -4471,7 +5030,7 @@ export default function App() {
   useEffect(() => {
     const handleHash = () => {
       const h = window.location.hash.replace('#', '');
-      if (['dashboard', 'payments', 'tickets', 'checkin', 'admitted', 'reminders', 'teams', 'coupons', 'referrals', 'settings'].includes(h)) {
+      if (['dashboard', 'payments', 'tickets', 'checkin', 'admitted', 'reminders', 'teams', 'coupons', 'referrals', 'settings', 'certificates'].includes(h)) {
         setTab(h);
       }
     };
@@ -4594,6 +5153,13 @@ export default function App() {
             Referrals <span>{referralSummary?.totalReferrals?.confirmed || 0}</span>
           </a>
           <a
+            href="#certificates"
+            className={tab === 'certificates' ? 'is-active' : ''}
+            onClick={() => changeTab('certificates')}
+          >
+            📜 Certificates
+          </a>
+          <a
             href="#settings"
             className={tab === 'settings' ? 'is-active' : ''}
             onClick={() => changeTab('settings')}
@@ -4690,6 +5256,7 @@ export default function App() {
         )}
         {tab === 'coupons' && <CouponsView onActionComplete={load} />}
         {tab === 'referrals' && <ReferralsView onActionComplete={load} />}
+        {tab === 'certificates' && <CertificatesView onNavigate={changeTab} />}
         {tab === 'settings' && <SettingsView onActionComplete={load} />}
       </main>
 
@@ -4732,7 +5299,7 @@ export default function App() {
         </button>
         <button
           type="button"
-          className={`mobile-nav-item ${['dashboard', 'payments', 'tickets', 'coupons', 'referrals', 'settings'].includes(tab) ? 'is-active' : ''}`}
+          className={`mobile-nav-item ${['dashboard', 'payments', 'tickets', 'coupons', 'referrals', 'settings', 'certificates'].includes(tab) ? 'is-active' : ''}`}
           onClick={() => setMobileDrawerOpen(true)}
         >
           <span className="mobile-nav-icon">☰</span>
