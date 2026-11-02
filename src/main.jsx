@@ -4441,12 +4441,12 @@ Certificate Details:
 • Institution: ${college}
 • Certificate ID: ${certId}
 
-Your official high-resolution certificate image (PNG) is attached with this email.
+You can view, verify, and download your official high-resolution certificate directly via the official ledger:
+🔗 ${certOnlineUrl}
 
-You can also view, verify, and download your certificate anytime online via the official ledger:
-${certOnlineUrl}
+(Direct 300 DPI PNG Download: ${certDownloadUrl})
 
-(Direct high-res PNG download: ${certDownloadUrl})
+All certificates are cryptographically verified and can be shared directly on LinkedIn, resume, or portfolio!
 
 Congratulations once again!
 
@@ -4521,17 +4521,14 @@ function CertificatePreviewModal({ participant, participants, onSelectParticipan
       // 2. Open Gmail compose immediately (synchronously in user click)
       window.open(gmailUrl, '_blank');
 
-      // 3. Download certificate PNG & copy to clipboard
-      await triggerCertificateDownloadAndCopy(participant);
-
-      // 4. Mark certificate as sent in database
+      // 3. Mark certificate as sent in database
       await api('certificate-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'mark_sent', memberId: participant.memberId, certId: participant.certificateId }),
       });
 
-      setMsg(`✓ Opened Gmail compose! Certificate PNG downloaded & copied to clipboard (press Cmd+V or drag to attach in Gmail).`);
+      setMsg(`✓ Opened Gmail compose! Direct certificate link and details pre-filled.`);
       if (onEmailSent) onEmailSent();
     } catch (err) {
       setMsg('Error: ' + err.message);
@@ -4704,17 +4701,14 @@ function CertificatesView({ onNavigate }) {
       // 1. Open Gmail compose immediately (synchronously in user click)
       window.open(gmailUrl, '_blank');
 
-      // 2. Download certificate PNG & copy image to clipboard
-      await triggerCertificateDownloadAndCopy(member);
-
-      // 3. Mark as sent in database
+      // 2. Mark as sent in database
       await api('certificate-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'mark_sent', memberId: member.memberId, certId: member.certificateId }),
       });
 
-      setNotice(`✓ Opened Gmail compose for ${member.fullName}! Certificate PNG downloaded & copied to clipboard (press Cmd+V or drag to attach in Gmail).`);
+      setNotice(`✓ Opened Gmail compose for ${member.fullName}! Direct certificate access link pre-filled.`);
       await loadData();
     } catch (err) {
       setError(err.message);
@@ -4775,7 +4769,7 @@ In recognition of your hard work and achievement, the Vulcan Club and Mirai Scho
 
 ${memberListText}
 
-Your team's high-resolution certificate images (PNG) are attached with this email. All certificates are cryptographically verified and can be shared on LinkedIn, resume, or portfolio.
+All certificates are cryptographically verified and can be viewed, downloaded in 300 DPI high resolution, and shared on LinkedIn, resume, or portfolio.
 
 Congratulations once again!
 
@@ -4790,25 +4784,14 @@ Contact: nexcell_rathinam@msot.org`;
       // 1. Open Gmail compose immediately
       window.open(gmailUrl, '_blank');
 
-      // 2. Download certificates for each member of the team
-      for (const m of teamMembers) {
-        const pngUrl = `/api/certificate-render?certId=${encodeURIComponent(m.certificateId)}&memberId=${encodeURIComponent(m.memberId)}&format=png`;
-        const a = document.createElement('a');
-        a.href = pngUrl;
-        a.download = `${m.certificateId}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }
-
-      // 3. Mark team certificates as sent in database
+      // 2. Mark team certificates as sent in database
       await api('certificate-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'mark_team_sent', teamId }),
       });
 
-      setNotice(`✓ Opened Gmail compose for Team ${teamName} (${teamMembers.length} recipients)! All certificates downloaded.`);
+      setNotice(`✓ Opened Gmail compose for Team ${teamName} (${teamMembers.length} recipients) with direct certificate access links!`);
       await loadData();
     } catch (err) {
       setError(err.message);
