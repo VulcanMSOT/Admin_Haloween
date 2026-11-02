@@ -211,51 +211,31 @@ export async function generateCertificateSvg({
     </g>
   </g>
 
-  <!-- 7. Footer: Signatures & Official Holographic Verification Seal -->
-  <!-- Left Signature: Lead Organizer (Sapnil Biswas) -->
-  <g transform="translate(190, 640)" text-anchor="middle">
-    <!-- Signature Graphic -->
-    <path d="M-60,0 Q-30,-25 0,-5 Q25,10 50,-15 T80,-5" fill="none" stroke="#ffa450" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
-    <line x1="-80" y1="12" x2="80" y2="12" stroke="#524363" stroke-width="1"/>
-    <text x="0" y="28" font-size="12" font-weight="800" fill="#ffffff" letter-spacing="1">
-      SAPNIL BISWAS
-    </text>
-    <text x="0" y="44" font-size="10" font-weight="600" fill="#a595b3" letter-spacing="0.5">
-      Lead Organizer, Vulcan Club
-    </text>
-  </g>
+  <!-- 7. Footer: Official Holographic Verification Seal & Dynamic QR Code (No signatures) -->
+  <!-- Flanking Ornamental Accent Lines -->
+  <line x1="180" y1="630" x2="470" y2="630" stroke="url(#goldGrad)" stroke-width="1" opacity="0.35"/>
+  <circle cx="180" cy="630" r="2.5" fill="#f59e0b" opacity="0.6"/>
+  <line x1="650" y1="630" x2="940" y2="630" stroke="url(#goldGrad)" stroke-width="1" opacity="0.35"/>
+  <circle cx="940" cy="630" r="2.5" fill="#f59e0b" opacity="0.6"/>
 
   <!-- Center: Official Holographic Verification Seal & Dynamic QR Code -->
-  <g transform="translate(560, 640)" text-anchor="middle">
+  <g transform="translate(560, 630)" text-anchor="middle">
     <!-- Outer Starburst/Rosette Seal -->
-    <circle cx="0" cy="-10" r="48" fill="#171024" stroke="url(#borderGrad)" stroke-width="2"/>
-    <circle cx="0" cy="-10" r="42" fill="none" stroke="#ff7a1a" stroke-width="0.75" stroke-dasharray="3, 2"/>
+    <circle cx="0" cy="-10" r="50" fill="#171024" stroke="url(#borderGrad)" stroke-width="2"/>
+    <circle cx="0" cy="-10" r="44" fill="none" stroke="#ff7a1a" stroke-width="0.75" stroke-dasharray="3, 2"/>
 
     <!-- Seal Inner QR Code -->
-    <image href="${qrDataUrl}" x="-28" y="-38" width="56" height="56"/>
+    <image href="${qrDataUrl}" x="-30" y="-40" width="60" height="60"/>
 
     <!-- Seal Ribbons -->
     <path d="M-18,34 L-30,68 L-14,60 L2,68 L-6,34 Z" fill="#b34900" opacity="0.85"/>
     <path d="M18,34 L6,68 L22,60 L38,68 L26,34 Z" fill="#b34900" opacity="0.85"/>
 
-    <text x="0" y="48" font-size="8" font-weight="800" fill="#ff9a3c" letter-spacing="1">
+    <text x="0" y="48" font-size="8.5" font-weight="800" fill="#ff9a3c" letter-spacing="1.2">
       OFFICIAL SEAL
     </text>
-    <text x="0" y="60" font-size="7.5" font-weight="700" fill="#8c7a9c" letter-spacing="0.5" font-family="monospace">
+    <text x="0" y="61" font-size="7.5" font-weight="700" fill="#8c7a9c" letter-spacing="0.5" font-family="monospace">
       ${certId}
-    </text>
-  </g>
-
-  <!-- Right Signature: Faculty Advisor (Mirai School of Technology) -->
-  <g transform="translate(930, 640)" text-anchor="middle">
-    <!-- Signature Graphic -->
-    <path d="M-50,-5 Q-20,15 10,-20 Q35,-5 60,-12 T75,0" fill="none" stroke="#ffa450" stroke-width="1.8" stroke-linecap="round" opacity="0.9"/>
-    <line x1="-80" y1="12" x2="80" y2="12" stroke="#524363" stroke-width="1"/>
-    <text x="0" y="28" font-size="12" font-weight="800" fill="#ffffff" letter-spacing="1">
-      FACULTY ADVISOR
-    </text>
-    <text x="0" y="44" font-size="10" font-weight="600" fill="#a595b3" letter-spacing="0.5">
-      Mirai School of Technology
     </text>
   </g>
 
