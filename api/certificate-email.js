@@ -20,7 +20,34 @@ export default async function handler(request, response) {
   if (!session) return;
 
   const body = parseBody(request);
-  const action = body.action || 'send_single'; // 'send_single' | 'send_team' | 'send_all' | 'test_preview' | 'mark_sent' | 'mark_team_sent'
+  const action = body.action || 'send_single'; // 'send_single' | 'send_team' | 'send_all' | 'test_preview' | 'mark_sent' | 'mark_team_sent' | 'mark_pending'
+
+  // Mark as pending (reset sent status)
+  if (action === 'mark_pending') {
+    const { memberId } = body;
+    if (!memberId) {
+      return json(response, 400, { error: 'memberId is required.' });
+    }
+
+    try {
+      await prisma.$executeRawUnsafe(`
+        UPDATE certificates
+        SET email_status = 'pending',
+            email_sent_at = NULL,
+            email_id = NULL,
+            email_error = NULL
+        WHERE member_id = $1
+      `, memberId);
+
+      return json(response, 200, {
+        ok: true,
+        message: 'Reset certificate delivery status to pending!',
+      });
+    } catch (err) {
+      console.error('Mark pending error:', err);
+      return json(response, 500, { error: err.message || 'Failed to mark certificate as pending.' });
+    }
+  }
 
   // 1. Mark as sent via Gmail
   if (action === 'mark_sent') {

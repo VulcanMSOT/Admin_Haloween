@@ -4540,6 +4540,24 @@ function CertificatePreviewModal({ participant, participants, onSelectParticipan
     }
   };
 
+  const handleResetPending = async () => {
+    setEmailing(true);
+    setMsg('');
+    try {
+      await api('certificate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mark_pending', memberId: participant.memberId }),
+      });
+      setMsg('✓ Reset status to Pending!');
+      if (onEmailSent) onEmailSent();
+    } catch (err) {
+      setMsg('Error: ' + err.message);
+    } finally {
+      setEmailing(false);
+    }
+  };
+
   const downloadPng = () => {
     const url = `/api/certificate-render?certId=${encodeURIComponent(participant.certificateId)}&memberId=${encodeURIComponent(participant.memberId)}&format=png`;
     const a = document.createElement('a');
@@ -4612,6 +4630,11 @@ function CertificatePreviewModal({ participant, participants, onSelectParticipan
             <button type="button" className="btn-cert-secondary" onClick={handleSendGmail} disabled={emailing}>
               {emailing ? 'Opening Gmail...' : `📧 Send via Gmail`}
             </button>
+            {participant.emailStatus === 'sent' && (
+              <button type="button" className="btn-cert-secondary" onClick={handleResetPending} disabled={emailing} style={{ color: '#ffbd80' }}>
+                ↺ Mark Pending
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -4692,6 +4715,27 @@ function CertificatesView({ onNavigate }) {
       });
 
       setNotice(`✓ Opened Gmail compose for ${member.fullName}! Certificate PNG downloaded & copied to clipboard (press Cmd+V or drag to attach in Gmail).`);
+      await loadData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyAction('');
+    }
+  };
+
+  // Reset certificate status to pending
+  const handleMarkPending = async (member) => {
+    if (!confirm(`Reset delivery status for ${member.fullName} back to Pending?`)) return;
+    setBusyAction(`Resetting ${member.fullName} to pending...`);
+    setError('');
+    setNotice('');
+    try {
+      const res = await api('certificate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mark_pending', memberId: member.memberId }),
+      });
+      setNotice(res.message || `✓ Reset ${member.fullName} status to Pending!`);
       await loadData();
     } catch (err) {
       setError(err.message);
@@ -5071,6 +5115,19 @@ Contact: nexcell_rathinam@msot.org`;
                       >
                         {isSent ? 'Resend in Gmail' : '📧 Send in Gmail'}
                       </button>
+
+                      {isSent && (
+                        <button
+                          type="button"
+                          className="table-action"
+                          onClick={() => handleMarkPending(p)}
+                          disabled={Boolean(busyAction)}
+                          title="Reset delivery status back to Pending"
+                          style={{ marginRight: '6px', color: '#ffbd80' }}
+                        >
+                          ↺ Reset
+                        </button>
+                      )}
 
                       <button
                         type="button"
